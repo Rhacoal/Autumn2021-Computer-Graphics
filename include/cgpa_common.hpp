@@ -1,5 +1,5 @@
-#ifndef ASSIGNMENT_COMMON_H
-#define ASSIGNMENT_COMMON_H
+#ifndef ASSIGNMENT_CGPA_COMMON_HPP
+#define ASSIGNMENT_CGPA_COMMON_HPP
 
 #include <GL/glew.h>
 
@@ -14,7 +14,7 @@ struct vertex_array_object {
 
     vertex_array_object(const vertex_array_object &) = delete;
 
-    vertex_array_object(vertex_array_object &&other) : vertexBuffer(other.vertexBuffer) {
+    vertex_array_object(vertex_array_object &&other) noexcept: vertexBuffer(other.vertexBuffer) {
         other.vertexBuffer = -1;
     }
 
@@ -24,6 +24,10 @@ struct vertex_array_object {
         }
     }
 };
+
+struct gl_context {
+
+};
 }
 
-#endif //ASSIGNMENT_COMMON_H
+#endif //ASSIGNMENT_CGPA_COMMON_HPP

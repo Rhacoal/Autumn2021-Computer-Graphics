@@ -1,7 +1,7 @@
 #ifndef ASSIGNMENT_GEOMETRY_HPP
 #define ASSIGNMENT_GEOMETRY_HPP
 
-#include "common.h"
+#include <cgpa_common.hpp>
 #include <GL/glew.h>
 
 namespace cgpa {

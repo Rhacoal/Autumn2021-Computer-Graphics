@@ -1,21 +1,14 @@
-// Include standard headers
+#include "shader_utils.h"
+#include "scene.hpp"
 #include <cstdio>
 #include <cstdlib>
-#include "shader_utils.h"
-#include "src/mesh/mesh.hpp"
-
-// Include GLEW
 #include <GL/glew.h>
-
-// Include GLFW
 #include <GLFW/glfw3.h>
-
-GLFWwindow *window;
-
-// Include GLM
 #include <glm/glm.hpp>
 
 using namespace glm;
+
+GLFWwindow *window;
 
 void draw() {
 
@@ -36,7 +29,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Open a window and create its OpenGL context
-    window = glfwCreateWindow(1024, 768, "Tutorial 01", NULL, NULL);
+    window = glfwCreateWindow(1024, 768, "Computer Graphics", NULL, NULL);
     if (window == NULL) {
         fprintf(stderr,
                 "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n");

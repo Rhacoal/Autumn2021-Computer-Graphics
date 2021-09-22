@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.17)
 project(assignment)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -38,6 +38,7 @@ include_directories(
         external/glew-1.13.0/include/
         external/assimp-3.0.1270/include/
         external/bullet-2.81-rev2613/src/
+        include/
         .
 )
 
@@ -55,7 +56,7 @@ add_definitions(
         -D_CRT_SECURE_NO_WARNINGS
 )
 
-add_executable(assignment src/main.cpp)
+add_executable(assignment src/main.cpp src/scene3d/scene.cpp src/mesh/mesh.cpp src/mesh/mesh.hpp)
 target_link_libraries(assignment
         ${ALL_LIBS}
         )
