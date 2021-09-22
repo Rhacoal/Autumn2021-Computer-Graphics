@@ -1,0 +1,272 @@
+{
+  "materials": [
+    {
+      "id": "mtl-ball",
+      "type": "standard",
+      "albedo": {
+        "texture": "material/rustediron2/rustediron2_basecolor.png"
+      },
+      "metallic": {
+        "texture": "material/rustediron2/rustediron2_metallic.png"
+      },
+      "roughness": {
+        "texture": "material/rustediron2/rustediron2_roughness.png"
+      },
+      "normal": {
+        "texture": "material/rustediron2/rustediron2_normal.png"
+      }
+    },
+    {
+      "id": "mtl-ball-phong",
+      "type": "phong",
+      "albedo": {
+        "texture": "material/rustediron2/rustediron2_basecolor.png"
+      }
+    },
+    {
+      "id": "mtl-floor",
+      "type": "standard",
+      "albedo": {
+        "color": [1, 0.7667436168621613, 0.33445780792388924]
+      },
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 1.0
+      }
+    },
+    {
+      "id": "mtl-bunny",
+      "type": "standard",
+      "albedo": {
+        "color": [0.798, 0.203, 1.056]
+      },
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 0.1
+      }
+    },
+    {
+      "id": "mtl-dragon",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 0.1]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.0
+      },
+      "ior": 1.33,
+      "transparent": true,
+      "specTrans": 1.0
+    },
+    {
+      "id": "mtl-glossy-mirror",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0]
+      },
+      "metallic": {
+        "intensity": 0.9
+      },
+      "roughness": {
+        "intensity": 0.01
+      }
+    },
+    {
+      "id": "mtl-dieletric-box",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 0.0]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.01
+      },
+      "ior": 1.0
+    },
+    {
+      "id": "mtl-glass-ball",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 0.1]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.0
+      },
+      "transparent": true,
+      "ior": 1.33,
+      "specTrans": 1.0
+    },
+    {
+      "id": "mtl-mirror-box",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 1.0]
+      },
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 0.0
+      },
+      "ior": 1.00
+    },
+    {
+      "id": "mtl-diffuse-wall",
+      "type": "standard",
+      "albedo": {
+        "texture": "material/wall.png"
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.7
+      }
+    },
+    {
+      "id": "mtl-diffuse-ceiling",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 0.4, 0.5]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.7
+      }
+    },
+    {
+      "id": "mtl-light",
+      "type": "standard",
+      "emission": [5.0, 5.0, 5.0],
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 1.0
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "floor",
+      "geometry": {
+        "type": "box",
+        "size": [200.0, 0.1, 200.0]
+      },
+      "position": [0.0, -0.05, 0.0],
+      "material": "mtl-floor"
+    },
+    {
+      "id": "ball1",
+      "geometry": {
+        "type": "sphere",
+        "radius": 1.0
+      },
+      "position": [-3.0, 2.0, -3.75],
+      "material": "mtl-ball"
+    },
+    {
+      "id": "glossy-mirror",
+      "geometry": {
+        "type": "box",
+        "size": [10.0, 2.0, 2.5]
+      },
+      "position": [0.0, 4, -7.0],
+      "material": "mtl-glossy-mirror"
+    },
+    {
+      "id": "mirror-box",
+      "geometry": {
+        "type": "box",
+        "size": [10.0, 3.0, 2.5]
+      },
+      "position": [0.0, 1.5, -7.0],
+      "material": "mtl-mirror-box"
+    },
+    {
+      "id": "dielectric-box",
+      "geometry": {
+        "type": "box",
+        "size": [2.0, 1.0, 2.0]
+      },
+      "rotation": [0.8, 0.0, 0.6, 0.0],
+      "position": [-3.0, 0.5, -3.75],
+      "material": "mtl-dieletric-box"
+    },
+    {
+      "id": "diffuse-wall",
+      "geometry": {
+        "type": "plane",
+        "size": [5.0, 10.0]
+      },
+      "position": [-5, 2.5, -0.75],
+      "rotation": [-0.70710678, 0.0, 0.0, 0.70710678],
+      "material": "mtl-diffuse-wall"
+    },
+    {
+      "id": "diffuse-ceiling",
+      "geometry": {
+        "type": "plane",
+        "size": [10.0, 10.0]
+      },
+      "position": [0.0, 5.0, -0.75],
+      "rotation": [0.0, 1.0, 0.0, 0.0],
+      "material": "mtl-diffuse-ceiling"
+    },
+    {
+      "id": "glass-ball",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.75
+      },
+      "position": [0.0, 0.75, 0.0],
+      "material": "mtl-glass-ball"
+    },
+    {
+      "id": "bunny",
+      "geometry": {
+        "type": "file",
+        "file": "object/bun_zipper.ply"
+      },
+      "position": [2.0, -0.5, -3.5],
+      "scale": [15.0, 15.0, 15.0],
+      "material": "mtl-bunny"
+    },
+    {
+      "id": "dragon",
+      "geometry": {
+        "type": "file",
+        "file": "object/dragon_vrip.ply"
+      },
+      "position": [-3.5, -1.0, 0.5],
+      "scale": [20.0, 20.0, 20.0],
+      "rotation": [-0.70710678, 0.0, 0.70710678, 0.0],
+      "material": "mtl-dragon"
+    },
+    {
+      "id": "light",
+      "isLight": true,
+      "position": [0.0, 4.99, 0.0],
+      "rotation": [0.0, 1.0, 0.0, 0.0],
+      "geometry": {
+        "type": "plane",
+        "size": [1.0, 1.0]
+      },
+      "material": "mtl-light"
+    }
+  ]
+}
