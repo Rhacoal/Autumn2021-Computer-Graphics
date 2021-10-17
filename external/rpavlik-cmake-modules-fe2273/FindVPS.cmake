@@ -189,7 +189,7 @@ list_combinations(_incsearchdirs
 	"/include"
 	"/include/vps"
 	"/src"
-	"/../src"
+	"/lib"
 	"/Viewer"
 	"/../Viewer")
 clean_directory_list(_incsearchdirs)

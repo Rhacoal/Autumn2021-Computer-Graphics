@@ -7,53 +7,24 @@ add_definitions(
 	-DTW_STATIC
 	-DTW_NO_LIB_PRAGMA
 	-DTW_NO_DIRECT3D
-	-DGLEW_STATIC
 	-D_CRT_SECURE_NO_WARNINGS
 )
 
 ### GLFW ###
 
-add_subdirectory (glfw-3.1.2)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 include_directories(
-	glfw-3.1.2/include/GLFW/
-	glew-1.13.0/include/
+		${OPENGL_INCLUDE_DIRS}
 )
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-set(OPENGL_LIBRARY
-	${OPENGL_LIBRARY}
-	-lGL -lGLU -lXrandr -lXext -lX11 -lrt
-	${CMAKE_DL_LIBS}
-	${GLFW_LIBRARIES}
-)
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-set(OPENGL_LIBRARY
-	${OPENGL_LIBRARY}
-	${CMAKE_DL_LIBS}
-	${GLFW_LIBRARIES}
-)
-endif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+add_subdirectory (glfw-3.1.2)
 
-### GLEW ###
-
-set(GLEW_SOURCE
-	glew-1.13.0/src/glew.c
-)
-
-set(GLEW_HEADERS
-)
-
-
-add_library( GLEW_1130 STATIC
-	${GLEW_SOURCE}
-	${GLEW_INCLUDE}
-)
-
-target_link_libraries(GLEW_1130
-	${OPENGL_LIBRARY}
-	${EXTRA_LIBS}
-)
+### GLAD ###
+add_library(glad glad/include/glad/glad.h glad/src/glad.c)
+target_include_directories(glad PUBLIC glad/include/)
 
 
 ### ANTTWEAKBAR ###
@@ -164,17 +135,4 @@ set(ZLIB_LIBRARIES zlib)
 set(BUILD_STATIC_LIB ON)
 #set(ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/zlib)
 add_subdirectory( assimp-3.0.1270/code )
-
-
-### BULLET ###
-# Bullet already has a CMakeLists.txt so let's use these
-
-set(BULLET_VERSION 2.81)
-include_directories(
-	bullet-2.81-rev2613/src
-)
-add_subdirectory( bullet-2.81-rev2613/src/BulletSoftBody )
-add_subdirectory( bullet-2.81-rev2613/src/BulletCollision )
-add_subdirectory( bullet-2.81-rev2613/src/BulletDynamics )
-add_subdirectory( bullet-2.81-rev2613/src/LinearMath )
 

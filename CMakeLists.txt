@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.17)
 project(assignment)
 
 set(CMAKE_CXX_STANDARD 17)
+if (APPLE)
+    set(FRAMEWORKS
+            "-framework Cocoa"
+            "-framework IOKit"
+            "-framework OpenGL"
+            "-framework CoreVideo"
+            )
+endif ()
 
 find_package(OpenGL REQUIRED)
 
@@ -35,31 +43,36 @@ include_directories(
         external/AntTweakBar-1.16/include/
         external/glfw-3.1.2/include/
         external/glm-0.9.7.1/
-        external/glew-1.13.0/include/
-        external/assimp-3.0.1270/include/
-        external/bullet-2.81-rev2613/src/
+        external/glad/include/
         include/
         .
 )
 
 set(ALL_LIBS
         ${OPENGL_LIBRARY}
+        glad
         glfw
-        GLEW_1130
+        ${FRAMEWORKS}
         )
 
 add_definitions(
         -DTW_STATIC
         -DTW_NO_LIB_PRAGMA
         -DTW_NO_DIRECT3D
-        -DGLEW_STATIC
         -D_CRT_SECURE_NO_WARNINGS
+        -DGL_SILENCE_DEPRECATION
 )
 
-add_executable(assignment src/main.cpp src/scene3d/scene.cpp src/mesh/mesh.cpp src/mesh/mesh.hpp)
+add_executable(assignment lib/scene3d/scene.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/shader/shader.cpp src/appmain.cpp)
 target_link_libraries(assignment
         ${ALL_LIBS}
         )
 # Xcode and Visual working directories
-set_target_properties(assignment PROPERTIES XCODE_ATTRIBUTE_CONFIGURATION_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-create_target_launcher(assignment WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+set_target_properties(assignment PROPERTIES XCODE_ATTRIBUTE_CONFIGURATION_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
+create_target_launcher(assignment WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
+
+configure_file(lib/shader/phong.fsh lib/shader/phong.fsh COPYONLY)
+configure_file(lib/shader/phong.vsh lib/shader/phong.vsh COPYONLY)
+
+configure_file(lib/shader/basic.fsh lib/shader/basic.fsh COPYONLY)
+configure_file(lib/shader/basic.vsh lib/shader/basic.vsh COPYONLY)
