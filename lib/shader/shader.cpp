@@ -23,12 +23,8 @@ std::string getShaderSource(GLuint shader) {
 cg::Shader::Shader(const char *vertexShaderSource, const char *fragmentShaderSource) {
     // compile vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    GLint length = 0;
-    glShaderSource(vertexShader, 1, &vertexShaderSource, &length);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
     glCompileShader(vertexShader);
-
-    auto vs = getShaderSource(vertexShader);
-    printf("error? %d %d %s\n", glGetError(), length, vertexShaderSource);
 
     // check for compilation errors
     int success;
@@ -41,7 +37,7 @@ cg::Shader::Shader(const char *vertexShaderSource, const char *fragmentShaderSou
 
     // compile fragment shader
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, &length);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
     glCompileShader(fragmentShader);
     // check for compilation errors
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
@@ -50,15 +46,12 @@ cg::Shader::Shader(const char *vertexShaderSource, const char *fragmentShaderSou
         fprintf(stderr, "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
     }
 
-    auto fs = getShaderSource(fragmentShader);
-
     // link program
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
-    puts(vs.c_str());
-    puts(fs.c_str());
+
     // check for linking errors
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if (!success) {

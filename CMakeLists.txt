@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.17)
 project(assignment)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 if (APPLE)
     set(FRAMEWORKS
             "-framework Cocoa"
@@ -12,7 +12,6 @@ if (APPLE)
 endif ()
 
 find_package(OpenGL REQUIRED)
-
 
 if (CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(FATAL_ERROR "Please select another Build Directory ! (and give it a clever name, like bin_Visual2012_64bits/)")
@@ -63,7 +62,7 @@ add_definitions(
         -DGL_SILENCE_DEPRECATION
 )
 
-add_executable(assignment lib/scene3d/scene.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/shader/shader.cpp src/appmain.cpp)
+add_executable(assignment lib/scene3d/object3d.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/shader/shader.cpp src/appmain.cpp)
 target_link_libraries(assignment
         ${ALL_LIBS}
         )

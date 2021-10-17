@@ -11,10 +11,15 @@ uniform mat4 mvpMatrix;
 
 out vec4 vColor;
 out vec2 vUv;
+out vec3 worldPosition;
 
 void main() {
     vColor = vec4(color, 1.0);
     vUv = uv;
 
-    gl_Position = mvpMatrix * vec4(position, 1.0);
+    vec4 pos = mvpMatrix * vec4(position, 1.0);
+    pos /= pos.w;
+    worldPosition = position.xyz;
+
+    gl_Position = pos;
 }

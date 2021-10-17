@@ -13,7 +13,7 @@ glm::mat4 look_at(glm::vec3 up, glm::vec3 target, glm::vec3 pos);
 // 3d objects, y-up
 class Object3D {
     mutable glm::mat4 _local_matrix;
-    mutable glm::mat4 _world_matrix;
+    mutable glm::mat4 _model_matrix;
     // position in location coordinates
     glm::vec3 _pos{0.0, 0.0, 0.0};
     glm::vec3 _target{0.0, 0.0, -1.0};
@@ -24,19 +24,19 @@ class Object3D {
     Object3D *_parent = nullptr;
 public:
     Object3D() {
-        updateWorldMatrix();
+        updateModelToWorldMatrix();
     }
 
     Object3D(const Object3D &) = delete;
 
     Object3D(Object3D &&) = delete;
 
-    void updateWorldMatrix() const {
-        _local_matrix = cg::look_at(glm::vec3{0.0, 1.0, 0.0}, _target, _pos);
+    void updateModelToWorldMatrix() const {
+        _local_matrix = glm::inverse(cg::look_at(glm::vec3{0.0, 1.0, 0.0}, _target, _pos));
         if (_parent) {
-            _world_matrix = _parent->_world_matrix * _local_matrix;
+            _model_matrix = _parent->modelToWorldMatrix() * _local_matrix;
         } else {
-            _world_matrix = _local_matrix;
+            _model_matrix = _local_matrix;
         }
         _need_update = false;
     }
@@ -46,6 +46,7 @@ public:
     }
 
     void setPosition(glm::vec3 pos) {
+        _target += pos - _pos;
         _pos = pos;
         _need_update = true;
     }
@@ -55,8 +56,8 @@ public:
         _need_update = true;
     }
 
-    glm::vec3 lookAt() const {
-        return _target;
+    glm::vec3 lookDir() const {
+        return _pos - _target;
     }
 
     void addChild(Object3D *obj) {
@@ -68,7 +69,7 @@ public:
     }
 
     glm::vec3 localToWorld(glm::vec3 pos) {
-        auto model_pos = _world_matrix * glm::vec4(pos, 1.0);
+        auto model_pos = _model_matrix * glm::vec4(pos, 1.0);
         return glm::vec3(model_pos.x, model_pos.y, model_pos.z) / model_pos.w;
     }
 
@@ -81,18 +82,29 @@ public:
         return nullptr;
     }
 
-    glm::mat4 worldMatrix() const {
+    glm::mat4 modelToWorldMatrix() const {
         if (_need_update) {
-            updateWorldMatrix();
+            updateModelToWorldMatrix();
         }
-        return _world_matrix;
+        return _model_matrix;
+    }
+
+    glm::mat4 parentModelToWorldMatrix() const {
+        return _parent ? _parent->modelToWorldMatrix() : glm::mat4(1.0);
+    }
+
+    glm::vec3 worldPosition() const {
+        return _parent ? glm::vec3(_parent->modelToWorldMatrix() * glm::vec4(_pos, 1.0f)) : _pos;
     }
 
     virtual cg::Mesh *isMesh() { return nullptr; }
 
     virtual cg::Light *isLight() { return nullptr; }
 
-    virtual void render(Renderer &re, Scene &sc, Camera &ca) {}
+    /**
+     * Submits draw calls to render.
+     */
+    virtual void render(Renderer &renderer, Scene &scene, Camera &camera) {}
 
     template<typename T>
     void traverse(const T &func) {

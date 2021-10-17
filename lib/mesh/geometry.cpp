@@ -8,16 +8,17 @@ cg::Geometry::Geometry(cg::Geometry &&b) noexcept: vao(b.vao), vbo(b.vbo), ebo(b
 
 void cg::Geometry::bindVAO(GLuint shaderProgram) {
     if (!inited) {
-        glGenVertexArrays(1, &vao);
-        glGenBuffers(1, &vbo);
-        glGenBuffers(1, &ebo);
+        check_err(glGenVertexArrays(1, &vao));
+        check_err(glGenBuffers(1, &vbo));
+        check_err(glGenBuffers(1, &ebo));
+        inited = true;
         _invalidate_vbo();
     }
     if (shaderProgram != prev_shaderProgram) {
         _need_re_layout = true;
         prev_shaderProgram = shaderProgram;
     }
-    glBindVertexArray(vao);
+    check_err(glBindVertexArray(vao));
     if (_need_update) {
         int buffer_size = 0;
         ssize_t vertexCount = -1;
@@ -32,6 +33,7 @@ void cg::Geometry::bindVAO(GLuint shaderProgram) {
             } else {
                 vertexCount = attrib.buf.size() / attrib.itemSize;
             }
+            count = vertexCount;
         }
         buffer_t buf(buffer_size);
         unsigned int offset = 0;
@@ -43,12 +45,11 @@ void cg::Geometry::bindVAO(GLuint shaderProgram) {
             }
             offset += attrib.itemSize;
         }
-        // TODO bind buffer
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, buffer_size, buf.data(), GL_STATIC_DRAW);
+        check_err(glBindBuffer(GL_ARRAY_BUFFER, vbo));
+        check_err(glBufferData(GL_ARRAY_BUFFER, buffer_size * sizeof(float), buf.data(), GL_STATIC_DRAW));
+        _need_update = false;
     }
     if (_need_re_layout) {
-        // TODO check if correct
         for (auto pos : _used_positions) {
             glDisableVertexAttribArray(pos);
         }
@@ -59,24 +60,26 @@ void cg::Geometry::bindVAO(GLuint shaderProgram) {
             stride += attrib.itemSize * sizeof(float);
         }
         for (const auto &[name, attrib] : attribs) {
-            offset += attrib.itemSize;
             GLint location = glGetAttribLocation(shaderProgram, name.c_str());
             if (location == -1) {
                 // attribute not found
             } else {
-                glVertexAttribPointer(location, attrib.itemSize, GL_FLOAT, false, stride,
-                                      (void *) (offset * sizeof(float)));
-                glEnableVertexAttribArray(location);
+                check_err(glVertexAttribPointer(location, attrib.itemSize, GL_FLOAT, GL_FALSE, stride,
+                                                (void *) (offset * sizeof(float))));
+                check_err(glEnableVertexAttribArray(location));
                 _used_positions.push_back(location);
             }
+            offset += attrib.itemSize;
         }
+        _need_re_layout = false;
     }
     if (_need_update_indices) {
-        if (useIndices()) {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indices->size(), indices->data(),
-                         GL_STATIC_DRAW);
+        if (hasIndices()) {
+            check_err(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo));
+            check_err(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indices->size(), indices->data(),
+                                   GL_STATIC_DRAW));
         }
+        _need_update_indices = false;
     }
 }
 
@@ -86,7 +89,7 @@ void cg::Geometry::mergeGeometry(const cg::Geometry &geo) {
 
 cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ) {
     float halfX = sizeX / 2, halfY = sizeY / 2, halfZ = sizeZ / 2;
-    float vertices[] = {
+    float positions[] = {
         -halfX, -halfY, -halfZ,
         halfX, -halfY, -halfZ,
         halfX, halfY, -halfZ,
@@ -95,6 +98,16 @@ cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ) {
         halfX, -halfY, halfZ,
         halfX, halfY, halfZ,
         -halfX, halfY, halfZ,
+    };
+    float colors[] = {
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        0.0f, 1.0f, 1.0f,
     };
     unsigned int indices[] = {
         0, 1, 2,
@@ -110,6 +123,7 @@ cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ) {
         0, 4, 5,
         0, 5, 1,
     };
-    addAttribute("position", vertices, 8 * 3, 3);
-    addIndices(indices, 8 * 3);
+    addAttribute("position", positions, 3);
+    addAttribute("color", colors, 3);
+    addIndices(indices);
 }

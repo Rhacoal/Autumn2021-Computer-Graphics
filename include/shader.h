@@ -7,8 +7,8 @@
 #include <string>
 
 namespace cg {
-
-struct Shader {
+class Shader {
+public:
     GLuint id;
 
     Shader();

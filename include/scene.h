@@ -17,4 +17,4 @@ public:
 };
 }
 
-#endif //ASSIGNMENT_SCENE_H
+#endif //ASSIGNMENT_OBJECT3D_H

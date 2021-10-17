@@ -7,6 +7,7 @@
 
 #include <string>
 #include <optional>
+#include <memory>
 
 namespace cg {
 
@@ -63,7 +64,18 @@ public:
 
     Material(Material &&) = delete;
 
-    virtual GLuint shaderProgram(Scene &sc, Camera &cam, ProgramArguments &pargs) = 0;
+    /**
+     * Called before switching to this shader program. This method is called only once per frame for all objects sharing
+     * this same material.
+     *
+     * @return shader program used
+     */
+    virtual GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) = 0;
+
+    /**
+     * Called on each object using this material to update uniforms for this particular object.
+     */
+    virtual void updateUniforms(Object3D *object, Camera &camera) = 0;
 
     virtual bool isTransparent() const noexcept = 0;
 };
@@ -83,8 +95,13 @@ public:
     }
 };
 
+template<typename M>
+class InstancedMaterial : public M {
+
+};
+
 class PhongMaterial : public Material {
-    typedef std::tuple<size_t, size_t> cache_key_t;
+    typedef std::tuple<int, int> cache_key_t;
     cache_key_t prevKey;
 public:
     Shader shader;
@@ -94,7 +111,9 @@ public:
 
     PhongMaterial() : color(1.0f), shininess(25.0f) {}
 
-    GLuint shaderProgram(Scene &sc, Camera &cam, ProgramArguments &pargs) noexcept override;
+    GLuint useShaderProgram(Scene &sc, Camera &cam, ProgramArguments &pargs) noexcept override;
+
+    void updateUniforms(Object3D *object, Camera &camera) override;
 
     bool isTransparent() const noexcept override {
         return false;

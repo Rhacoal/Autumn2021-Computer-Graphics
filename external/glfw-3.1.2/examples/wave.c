@@ -361,7 +361,7 @@ void scroll_callback(GLFWwindow* window, double x, double y)
 // Callback function for framebuffer resize events
 //========================================================================
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
     float ratio = 1.f;
     mat4x4 projection;

@@ -5,18 +5,10 @@
 #include <stb_image.h>
 
 #include <cstdio>
-
-void cg::Application::update() {
-    // lets do something
-}
-
-void cg::Application::draw() {
-
-}
-
-void cg::Application::initScene() {
-
-}
+#include <chrono>
+#include <algorithm>
+#include <numeric>
+#include <external/glfw-3.1.2/deps/GL/glext.h>
 
 void cg::Application::terminate() {
     _running = 0;
@@ -27,6 +19,33 @@ void cg::Application::terminate() {
 cg::Scene &cg::Application::currentScene() {
     return _scene;
 }
+
+using namespace std::chrono_literals;
+
+struct MA {
+    constexpr static int MAX = 50;
+    std::optional<decltype(std::chrono::steady_clock::now())> tp;
+    double intervals[MAX] = {};
+    int ptr = 0;
+
+    void tick() {
+        auto t1 = std::chrono::steady_clock::now();
+        if (tp.has_value()) {
+            intervals[ptr] = std::chrono::duration<double, std::milli>(t1 - tp.value()).count();
+            ptr = (ptr + 1) % MAX;
+        }
+        tp = t1;
+    }
+
+    void track(double t) {
+        tp.reset();
+        intervals[(ptr++) % MAX] = t;
+    }
+
+    double average() {
+        return 1000.0 / std::accumulate(intervals, intervals + MAX, 0.0) * MAX;
+    }
+};
 
 cg::Texture cg::Application::loadTexture(const char *path) {
     // if loaded, simply returns it
@@ -61,6 +80,16 @@ cg::Texture cg::Application::loadTexture(const char *path) {
     return Texture(tex);
 }
 
+static bool frameBufferResized = false;
+int new_width, new_height;
+
+void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
+    frameBufferResized = true;
+    new_width = width;
+    new_height = height;
+    glViewport(0, 0, width, height);
+}
+
 void cg::Application::start(const ApplicationConfig &config) {
     if (started) {
         return;
@@ -73,7 +102,7 @@ void cg::Application::start(const ApplicationConfig &config) {
     }
 
     glfwWindowHint(GLFW_SAMPLES, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -102,22 +131,38 @@ void cg::Application::start(const ApplicationConfig &config) {
 
     // Ensure we can capture the escape key being pressed below
     glfwSetInputMode(_window, GLFW_STICKY_KEYS, GL_TRUE);
+    glfwSetFramebufferSizeCallback(_window, framebufferSizeCallback);
 
     // main app loop
     initScene();
 
-    // Dark blue background
-    glClearColor(0.0f, 0.0f, 1.0f, 0.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
 
+    MA frame_ma;
+    int ticks = 0;
     do {
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        if (frameBufferResized) {
+            onResize(new_width, new_height);
+        }
         update();
         draw();
+        frame_ma.tick();
+        if ((++ticks) % 100 == 0) {
+            printf("average: %lf\n", frame_ma.average());
+            ticks = 0;
+        }
 
         // Swap buffers
-        glfwSwapBuffers(window());
+        glfwSwapBuffers(_window);
         glfwPollEvents();
 
-    } while (running() && glfwWindowShouldClose(window()) == 0);
+    } while (running() && glfwWindowShouldClose(_window) == 0);
+}
+
+void cg::Application::setClearColor(float r, float g, float b, float a) {
+    glClearColor(r, g, b, a);
 }

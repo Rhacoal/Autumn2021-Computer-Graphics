@@ -7,13 +7,14 @@
 #include <camera.h>
 
 #include <optional>
+#include <algorithm>
 
 void cg::Renderer::render(Scene &sc, Camera &cam) {
     ProgramArguments pargs;
+    draw_calls.clear();
 
     // collect lighting
     sc.traverse([&](Object3D &obj) {
-        obj.updateWorldMatrix();
         if (obj.isLight()) {
             pargs.lights.push_back(obj.isLight());
         }
@@ -24,38 +25,37 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
     });
 
     // arranges draw order
-    sort(begin(draw_calls), end(draw_calls),
-         [](const auto &l, const auto &r) {
-             auto[l_mat, l_geo] = l;
-             auto[r_mat, r_geo] = r;
-             // draw same materials together
-             if (l_mat == r_mat) {
-                 return false;
-             }
-//             // draw transparent objects last
-//             if (l_mat->isTransparent() != r_mat->isTransparent()) {
-//                 return r_mat->isTransparent();
-//             }
-             return l_mat < r_mat;
-         }
-    );
+    std::sort(begin(draw_calls), end(draw_calls), [](const auto &l, const auto &r) {
+        const auto&[l_mat, l_geo, l_obj] = l;
+        const auto&[r_mat, r_geo, r_obj] = r;
+        // draw same materials together
+        return l_mat < r_mat;
+//        // draw transparent objects last
+//        if (l_mat->isTransparent() != r_mat->isTransparent()) {
+//            return r_mat->isTransparent();
+//        }
+    });
 
     // render objects in order
     std::optional<Material *> current_material;
     GLuint sp = 0;
-    for (auto[mat, geo] : draw_calls) {
+    for (auto[mat, geo, obj] : draw_calls) {
         if (current_material != mat) {
             // switch material
-            sp = mat->shaderProgram(sc, cam, pargs);
-            if (sp) {
-                glUseProgram(sp);
-            }
+            sp = mat->useShaderProgram(sc, cam, pargs);
             current_material = mat;
         }
+
+        mat->updateUniforms(obj, cam);
+
         if (!sp) { continue; }
         geo->bindVAO(sp);
 
-        glDrawElements(GL_TRIANGLES, geo->vertexCount(), GL_UNSIGNED_INT, nullptr);
+        if (geo->hasIndices()) {
+            check_err(glDrawElements(GL_TRIANGLES, geo->elementCount(), GL_UNSIGNED_INT, nullptr));
+        } else {
+            check_err(glDrawArrays(GL_TRIANGLES, 0, geo->elementCount()));
+        }
     }
     glUseProgram(0);
 }

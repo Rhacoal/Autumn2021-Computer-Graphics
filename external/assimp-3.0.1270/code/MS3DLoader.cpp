@@ -610,7 +610,7 @@ void MS3DImporter::InternReadFile( const std::string& pFile,
 
 		anim->mName.Set("<MS3DMasterAnim>");
 
-		// carry the fps info to the user by scaling all times with it
+		// carry the average info to the user by scaling all times with it
 		anim->mTicksPerSecond = animfps;
 		
 		// leave duration at its default, so ScenePreprocessor will fill an appropriate

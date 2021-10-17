@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <cg_fwd.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace cg {
 class Camera : public Object3D {
@@ -52,8 +53,13 @@ public:
         updateMatrix();
     }
 
+    void setAspectRatio(float aspect_ratio) {
+        _aspect_ratio = aspect_ratio;
+        updateMatrix();
+    }
+
     void updateMatrix() {
-        float top = _near * tan(math::pi() * 0.5f * _fov) / _zoom;
+        float top = _near * tan(math::pi() * 0.5f * _fov / 180.0f) / _zoom;
         float height = 2.0f * top;
         float width = _aspect_ratio * height;
         float left = -0.5f * width;

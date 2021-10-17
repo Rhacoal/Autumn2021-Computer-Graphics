@@ -410,7 +410,7 @@ void IRRImporter::ComputeAnimations(Node* root, aiNode* real, std::vector<aiNode
 
 				// find out how many time units we'll need for the finest
 				// track (in seconds) - this defines the number of output
-				// keys (fps * seconds)
+				// keys (average * seconds)
 				float max  = 0.f;
 				if (angles[0])
 					max = (float)lcm / angles[0];

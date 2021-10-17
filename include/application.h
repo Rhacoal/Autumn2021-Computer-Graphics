@@ -26,23 +26,27 @@ class Application {
     int started = 0;
     Scene _scene;
 public:
-    Application() noexcept = default;
+    Application() = default;
 
     Application(const Application &) = delete;
 
     virtual ~Application() = default;
 
-    virtual void update();
+    virtual void update() {}
 
-    virtual void draw();
+    virtual void draw() {}
 
-    virtual void initScene();
+    virtual void onResize(int width, int height) {}
+
+    virtual void initScene() {}
 
     Scene &currentScene();
 
     void start(const ApplicationConfig &config);
 
     void terminate();
+
+    void setClearColor(float r, float g, float b, float a);
 
     GLFWwindow *window() const { return _window; }
 

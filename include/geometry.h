@@ -46,39 +46,50 @@ public:
         return true;
     }
 
+    template<size_t N>
+    void addAttribute(const std::string &name, const float (&array)[N], unsigned int itemSize) {
+        addAttribute(name, array, N, itemSize);
+    }
+
     void addAttribute(const std::string &name, const float *array, size_t array_size, unsigned int itemSize) {
         attribs.emplace(name, attrib{-1, buffer_t(array, array + array_size), itemSize, false});
         _invalidate_vbo();
     }
 
-    void addIndices(const unsigned int *array, size_t array_size) {
+    template<size_t N>
+    void addIndices(const unsigned int (&array)[N]) {
+        addIndices(array, N);
+    }
+
+    void addIndices(const unsigned int *array, size_t arrayLength) {
         if (!array) {
             indices.reset();
             _invalidate_ebo();
             return;
         }
         if (!indices.has_value()) {
-            indices.emplace(array_size);
+            indices.emplace(arrayLength);
         } else {
-            indices->resize(array_size);
+            indices->resize(arrayLength);
         }
-        std::copy_n(array, array_size, indices->begin());
+        std::copy_n(array, arrayLength, indices->begin());
         _invalidate_ebo();
     }
 
-    bool useIndices() const noexcept {
+    bool hasIndices() const noexcept {
         return indices.has_value();
-    }
-
-    GLuint EBO() const {
-        return ebo;
     }
 
     void mergeGeometry(const Geometry &geo);
 
     void bindVAO(GLuint shaderProgram);
 
-    GLsizei vertexCount() const { return count; }
+    GLsizei elementCount() const {
+        if (indices.has_value()) {
+            return static_cast<GLsizei>(indices->size());
+        }
+        return count;
+    }
 
 private:
     void _invalidate_vbo() {
