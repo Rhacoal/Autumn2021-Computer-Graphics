@@ -4,51 +4,13 @@
 #include <cg_common.h>
 #include <cg_fwd.h>
 #include <shader.h>
+#include <texture.h>
 
 #include <string>
 #include <optional>
 #include <memory>
 
 namespace cg {
-
-struct _textureImpl {
-    std::optional<GLuint> tex;
-
-    explicit _textureImpl(GLuint tex) noexcept: tex(tex) {}
-
-    _textureImpl(const _textureImpl &) = delete;
-
-    _textureImpl(_textureImpl &&rhs) noexcept: tex(rhs.tex) {
-        rhs.tex.reset();
-    }
-
-    ~_textureImpl() {
-        if (tex.has_value()) {
-            glDeleteTextures(1, &tex.value());
-        }
-    }
-};
-
-enum class DefaultTexture {
-    WHITE, BLACK, DEFAULT_NORMAL, TRANSPARENT,
-};
-
-class Texture {
-private:
-    std::shared_ptr<_textureImpl> impl;
-public:
-    explicit Texture(GLuint tex) : impl(std::make_shared<_textureImpl>(tex)) {}
-
-    Texture(const Texture &) = default;
-
-    Texture(Texture &&) = default;
-
-    static Texture defaultTexture(DefaultTexture defaultTexture);
-
-    GLuint tex() const {
-        return impl->tex.value();
-    }
-};
 
 /**
  * Material of an object, including color, textures, shaders and so on.

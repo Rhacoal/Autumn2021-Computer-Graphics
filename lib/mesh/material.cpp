@@ -6,54 +6,9 @@
 
 #include <string>
 #include <sstream>
-#include <map>
 #include <utility>
 #include <tuple>
-
-static float TEX_WHITE[] = {1.0f, 1.0f, 1.0f, 1.0f};
-static float TEX_BLACK[] = {0.0f, 0.0f, 0.0f, 1.0f};
-static float TEX_NORMAL[] = {0.0f, 0.0f, 1.0f, 1.0f};
-static float TEX_TRANSPARENT[] = {0.0f, 0.0f, 0.0f, 0.0f};
-
-cg::Texture cg::Texture::defaultTexture(cg::DefaultTexture type) {
-    static std::map<cg::DefaultTexture, cg::Texture> defaultTexMap;
-    auto it = defaultTexMap.find(type);
-    if (it != defaultTexMap.end()) {
-        return it->second;
-    }
-
-    float *data = nullptr;
-    switch (type) {
-        case DefaultTexture::WHITE:
-            data = TEX_WHITE;
-            break;
-        case DefaultTexture::BLACK:
-            data = TEX_BLACK;
-            break;
-        case DefaultTexture::DEFAULT_NORMAL:
-            data = TEX_NORMAL;
-            break;
-        case DefaultTexture::TRANSPARENT:
-            data = TEX_TRANSPARENT;
-            break;
-    }
-
-    GLuint tex;
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-
-    // set the texture wrapping/filtering options (on the currently bound texture object)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // load and generate the texture
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGBA, GL_FLOAT, data);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-
-    return defaultTexMap.emplace(type, tex).first->second;
-}
+#include <texture.h>
 
 static std::string readFile(const char *path) {
     std::stringstream ret;
@@ -66,7 +21,6 @@ static std::string readFile(const char *path) {
     fclose(f);
     return ret.str();
 }
-
 
 int cg::Material::latest_id = 1;
 

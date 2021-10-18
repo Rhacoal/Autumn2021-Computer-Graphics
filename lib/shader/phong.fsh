@@ -37,14 +37,15 @@ out vec4 fragColor;
 
 void main() {
     vec4 diffuseColor = texture(diffuse, vUv);
-//    fragColor = vec4((vPos + 1) * 0.5, 1.0);
     float opacity = diffuseColor.a;
 
+#if POINT_LIGHT_COUNT
     for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
         vec3 L = normalize(pointLights[i].position - worldPosition);
         vec3 V = normalize(camera.position - worldPosition);
         vec3 H = normalize(L + V);
-
+        vec3 specPow;
     }
-    fragColor = vec4(1.0);
+#endif
+    fragColor = vec4(1.0, 0.5, 0.5, 1.0);
 }

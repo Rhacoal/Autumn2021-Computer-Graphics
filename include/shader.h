@@ -30,6 +30,24 @@ public:
 
     ~Shader();
 };
+
+struct ShaderPassImpl;
+
+class ShaderPass {
+    std::shared_ptr<ShaderPassImpl> _impl;
+public:
+    ShaderPass(const char *fragmentShaderSource, int width, int height);
+
+    ShaderPass(ShaderPass &&) = default;
+
+    ShaderPass(const ShaderPass &) = default;
+
+    void resize(int width, int height);
+
+    void renderBegin();
+
+    void renderEnd();
+};
 }
 
 #endif //ASSIGNMENT_SHADER_H

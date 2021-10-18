@@ -8,7 +8,6 @@
 #include <chrono>
 #include <algorithm>
 #include <numeric>
-#include <external/glfw-3.1.2/deps/GL/glext.h>
 
 void cg::Application::terminate() {
     _running = 0;
@@ -81,12 +80,9 @@ cg::Texture cg::Application::loadTexture(const char *path) {
 }
 
 static bool frameBufferResized = false;
-int new_width, new_height;
 
 void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
     frameBufferResized = true;
-    new_width = width;
-    new_height = height;
     glViewport(0, 0, width, height);
 }
 
@@ -102,7 +98,7 @@ void cg::Application::start(const ApplicationConfig &config) {
     }
 
     glfwWindowHint(GLFW_SAMPLES, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -117,6 +113,7 @@ void cg::Application::start(const ApplicationConfig &config) {
         return;
     }
     glfwMakeContextCurrent(_window);
+    glfwGetFramebufferSize(_window, &width, &height);
 
     if (!initGL()) {
         fprintf(stderr, "Failed to initialize GLEW\n");
@@ -131,6 +128,7 @@ void cg::Application::start(const ApplicationConfig &config) {
 
     // Ensure we can capture the escape key being pressed below
     glfwSetInputMode(_window, GLFW_STICKY_KEYS, GL_TRUE);
+
     glfwSetFramebufferSizeCallback(_window, framebufferSizeCallback);
 
     // main app loop
@@ -146,10 +144,12 @@ void cg::Application::start(const ApplicationConfig &config) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (frameBufferResized) {
-            onResize(new_width, new_height);
+            glfwGetFramebufferSize(_window, &width, &height);
+            onResize(width, height);
         }
         update();
         draw();
+
         frame_ma.tick();
         if ((++ticks) % 100 == 0) {
             printf("average: %lf\n", frame_ma.average());
@@ -161,8 +161,7 @@ void cg::Application::start(const ApplicationConfig &config) {
         glfwPollEvents();
 
     } while (running() && glfwWindowShouldClose(_window) == 0);
-}
 
-void cg::Application::setClearColor(float r, float g, float b, float a) {
-    glClearColor(r, g, b, a);
+    cleanUp();
+    terminate();
 }

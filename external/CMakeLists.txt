@@ -27,6 +27,15 @@ add_library(glad glad/include/glad/glad.h glad/src/glad.c)
 target_include_directories(glad PUBLIC glad/include/)
 
 
+### IMGUI ###
+file(GLOB IMGUI_SRC imgui-1.85/src/*.cpp)
+file(GLOB IMGUI_INCLUDE imgui-1.85/include/*.h)
+add_library(imgui
+		${IMGUI_SRC}
+		${IMGUI_INCLUDE})
+target_include_directories(imgui PUBLIC imgui-1.85/include glfw-3.1.2/include)
+
+
 ### ANTTWEAKBAR ###
 
 set(ANTTWEAKBAR_SOURCE

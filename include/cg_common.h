@@ -14,7 +14,8 @@ typedef SSIZE_T ssize_t;
 #endif
 
 #include <cstdint>
-#include <exception>
+#include <stdexcept>
+#include <cstdio>
 
 namespace cg {
 inline int initGL() {
@@ -30,12 +31,9 @@ inline void assert_ok() {
     auto err = glGetError();
     if (err) {
         snprintf(buf, 256, "GLError: %d\n", err);
-        throw std::exception(buf);
+        throw std::runtime_error(buf);
     }
 }
-
-void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
-                            GLsizei length, const char *message, const void *userParam);
 
 namespace math {
 constexpr double pi() {
@@ -47,5 +45,11 @@ constexpr double half_pi() {
 }
 }
 
+namespace util {
+template<typename T, size_t N>
+constexpr size_t arraySize(T (&arr)[N]) {
+    return N;
+}
+}
 }
 #endif //ASSIGNMENT_CG_COMMON_H

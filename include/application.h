@@ -25,6 +25,7 @@ class Application {
     volatile int _running = 1;
     int started = 0;
     Scene _scene;
+    int width{}, height{};
 public:
     Application() = default;
 
@@ -36,17 +37,21 @@ public:
 
     virtual void draw() {}
 
-    virtual void onResize(int width, int height) {}
+    virtual void onResize(int, int) {}
 
     virtual void initScene() {}
+
+    virtual void cleanUp() {}
+
+    int windowWidth() const { return width; }
+
+    int windowHeight() const { return height; }
 
     Scene &currentScene();
 
     void start(const ApplicationConfig &config);
 
     void terminate();
-
-    void setClearColor(float r, float g, float b, float a);
 
     GLFWwindow *window() const { return _window; }
 

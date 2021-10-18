@@ -51,6 +51,7 @@ set(ALL_LIBS
         ${OPENGL_LIBRARY}
         glad
         glfw
+        imgui
         ${FRAMEWORKS}
         )
 
@@ -62,7 +63,7 @@ add_definitions(
         -DGL_SILENCE_DEPRECATION
 )
 
-add_executable(assignment lib/scene3d/object3d.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/shader/shader.cpp src/appmain.cpp)
+add_executable(assignment lib/scene3d/object3d.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/shader/shader.cpp src/appmain.cpp lib/util/texture.cpp)
 target_link_libraries(assignment
         ${ALL_LIBS}
         )
