@@ -15,6 +15,10 @@ public:
     const glm::mat4 &projectionMatrix() const {
         return _project;
     }
+
+    virtual glm::mat4 viewMatrix() const {
+        return glm::inverse(modelToWorldMatrix());
+    }
 };
 
 class PerspectiveCamera : public Camera {
@@ -66,8 +70,8 @@ public:
 
         float right = left + width;
         float bottom = top - height;
-
-        makePerspective(_project, left, right, top, bottom, _near, _far);
+        _project = glm::perspective(glm::radians(_fov), _aspect_ratio, _near, _far);
+//        makePerspective(_project, left, right, top, bottom, _near, _far);
     }
 };
 

@@ -113,9 +113,13 @@ private:
     GLsizei count = 0;
 };
 
+enum class Side {
+    FrontSide, BackSide, DoubleSide
+};
+
 class BoxGeometry : public Geometry {
 public:
-    BoxGeometry(float sizeX, float sizeY, float sizeZ);
+    BoxGeometry(float sizeX, float sizeY, float sizeZ, Side side = Side::FrontSide);
 };
 }
 

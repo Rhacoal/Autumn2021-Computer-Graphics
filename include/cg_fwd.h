@@ -16,25 +16,39 @@ struct ProgramArguments;
 
 class Renderer;
 
-struct Texture;
+class Texture;
+
+class CubeTexture;
 
 class Shader;
+
+class ShaderPass;
+
+class ShaderPassLink;
 
 class Material;
 
 class PhongMaterial;
 
+class SkyboxMaterial;
+
 class StandardMaterial;
 
 class Geometry;
 
+class BoxGeometry;
+
 class Mesh;
+
+class Skybox;
 
 class Light;
 
 class DirectionalLight;
 
 class PointLight;
+
+class AmbientLight;
 }
 
 #endif //ASSIGNMENT_CG_FWD_H

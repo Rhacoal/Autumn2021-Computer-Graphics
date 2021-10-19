@@ -8,13 +8,15 @@ class Light : public Object3D {
     glm::vec3 _color;
     float _intensity;
 public:
-    Light(glm::vec3 color, float intensity = 1.0) : _color(color), _intensity(intensity) {}
+    explicit Light(glm::vec3 color, float intensity = 1.0) : _color(color), _intensity(intensity) {}
 
-    cg::Light *isLight() override { return this; }
+    Light *isLight() override { return this; }
 
-    virtual cg::PointLight *isPointLight() { return nullptr; }
+    virtual PointLight *isPointLight() { return nullptr; }
 
-    virtual cg::DirectionalLight *isDirectionalLight() { return nullptr; }
+    virtual DirectionalLight *isDirectionalLight() { return nullptr; }
+
+    virtual AmbientLight *isAmbientLight() { return nullptr; }
 
     glm::vec3 color() const {
         return _color;
@@ -35,16 +37,26 @@ public:
 
 class PointLight : public Light {
 public:
-    PointLight(glm::vec3 color, float intensity = 1.0) : Light(color, intensity) {}
+    explicit PointLight(glm::vec3 color, float intensity = 1.0) : Light(color, intensity) {}
 
-    cg::PointLight *isPointLight() override { return this; }
+    PointLight *isPointLight() override { return this; }
 };
 
 class DirectionalLight : public Light {
 public:
-    DirectionalLight(glm::vec3 color, float intensity = 1.0) : Light(color, intensity) {}
+    explicit DirectionalLight(glm::vec3 direction, glm::vec3 color, float intensity = 1.0) : Light(color, intensity) {
+        setPosition(direction);
+        lookAt(glm::vec3(0.0f));
+    }
 
-    cg::DirectionalLight *isDirectionalLight() override { return this; }
+    DirectionalLight *isDirectionalLight() override { return this; }
+};
+
+class AmbientLight : public Light {
+public:
+    explicit AmbientLight(glm::vec3 color, float intensity = 1.0) : Light(color, intensity) {}
+
+    AmbientLight *isAmbientLight() override { return this; }
 };
 }
 

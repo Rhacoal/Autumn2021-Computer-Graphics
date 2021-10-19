@@ -39,7 +39,7 @@ public:
      */
     virtual void updateUniforms(Object3D *object, Camera &camera) = 0;
 
-    virtual bool isTransparent() const noexcept = 0;
+    virtual bool isTransparent() const noexcept { return false; };
 };
 
 template<typename T>
@@ -71,15 +71,23 @@ public:
     glm::vec4 color;
     glm::float32 shininess;
 
-    PhongMaterial() : color(1.0f), shininess(25.0f) {}
+    PhongMaterial() : color(1.0f), shininess(1.0f) {}
 
-    GLuint useShaderProgram(Scene &sc, Camera &cam, ProgramArguments &pargs) noexcept override;
+    GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) noexcept override;
 
     void updateUniforms(Object3D *object, Camera &camera) override;
+};
 
-    bool isTransparent() const noexcept override {
-        return false;
-    }
+class SkyboxMaterial : public Material {
+public:
+    Shader shader;
+    std::optional<CubeTexture> skybox;
+
+    SkyboxMaterial() = default;
+
+    GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) noexcept override;
+
+    void updateUniforms(Object3D *object, Camera &camera) override;
 };
 
 struct StandardMaterial : public Material {

@@ -40,6 +40,10 @@ constexpr double pi() {
     return 3.14159265358979323846;
 }
 
+constexpr double radians(double degree) {
+    return degree / 180. * pi();
+}
+
 constexpr double half_pi() {
     return 1.57079632679489661923;
 }

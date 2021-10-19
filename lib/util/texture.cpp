@@ -2,6 +2,7 @@
 
 #include <map>
 #include <optional>
+#include <stb_image.h>
 
 static float TEX_WHITE[] = {1.0f, 1.0f, 1.0f, 1.0f};
 static float TEX_BLACK[] = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -42,6 +43,43 @@ struct TextureImpl {
         }
     }
 };
+}
+
+cg::CubeTexture::CubeTexture(GLuint tex) : impl(std::make_shared<TextureImpl>(tex)) {}
+
+cg::CubeTexture::CubeTexture() : impl(std::make_shared<TextureImpl>()) {}
+
+GLuint cg::CubeTexture::tex() const {
+    return impl ? impl->tex : 0;
+}
+
+cg::CubeTexture cg::CubeTexture::load(const char **faces) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < 6; i++) {
+        if (!faces[i]) continue;
+        unsigned char *data = stbi_load(faces[i], &width, &height, &nrChannels, 3);
+        if (data) {
+            // by default, assumes that skybox is in srgb
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                         0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+            );
+            stbi_image_free(data);
+        } else {
+            fprintf(stderr, "failed to load: %s\n", faces[i]);
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return CubeTexture(textureID);
 }
 
 cg::Texture cg::Texture::defaultTexture(cg::DefaultTexture type) {
@@ -89,7 +127,7 @@ cg::Texture::Texture(GLuint tex) : impl(std::make_shared<TextureImpl>(tex)) {}
 cg::Texture::Texture() : impl(std::make_shared<TextureImpl>()) {}
 
 GLuint cg::Texture::tex() const {
-    return impl->tex;
+    return impl ? impl->tex : 0;
 }
 
 void cg::Texture::generate(int width, int height, GLenum format) {

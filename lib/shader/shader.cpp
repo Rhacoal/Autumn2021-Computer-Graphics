@@ -112,9 +112,10 @@ struct ShaderPassImpl {
     GLuint vao{}, vbo{}, ebo{};
     GLuint fbo{}, rbo{};
     Texture colorBuffer;
+    int buffer_width, buffer_height;
 
     ShaderPassImpl(const char *fragmentShaderSource, int width, int height)
-        : shader(shaderPassVertexShader, fragmentShaderSource) {
+        : shader(shaderPassVertexShader, fragmentShaderSource), buffer_width(width), buffer_height(height) {
         glGenVertexArrays(1, &vao);
         glGenBuffers(1, &vbo);
         glGenBuffers(1, &ebo);
@@ -162,6 +163,11 @@ struct ShaderPassImpl {
     }
 
     void resize(int width, int height) {
+        if (width == this->buffer_width && height == this->buffer_height) {
+            return;
+        }
+        this->buffer_width = width;
+        this->buffer_height = height;
         deleteFrameBuffer();
         createFrameBuffer(width, height);
     }
@@ -176,7 +182,21 @@ struct ShaderPassImpl {
     void renderEnd() {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDisable(GL_DEPTH_TEST);
-//        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        shader.use();
+        glBindVertexArray(vao);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffer.tex());
+        glDrawElements(GL_TRIANGLES, util::arraySize(indices), GL_UNSIGNED_SHORT, nullptr);
+        glBindVertexArray(0);
+    }
+
+    void thenBegin(ShaderPassImpl &impl) {
+        impl.renderBegin();
+        glDisable(GL_DEPTH_TEST);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         shader.use();
@@ -194,20 +214,51 @@ struct ShaderPassImpl {
         deleteFrameBuffer();
     }
 };
+
+ShaderPassLink::ShaderPassLink(int width, int height) : _width(width), _height(height) {
+
 }
 
-cg::ShaderPass::ShaderPass(const char *fragmentShaderSource, int width, int height)
+void ShaderPassLink::renderBegin() {
+    for (auto &pass : passes) {
+        pass->resize(_width, _height);
+    }
+    if (!passes.empty()) {
+        passes[0]->renderBegin();
+    }
+}
+
+void ShaderPassLink::renderEnd() {
+    for (int i = 0; i + 1 < passes.size(); ++i) {
+        passes[i]->thenBegin(*passes[i + 1]);
+    }
+    if (!passes.empty()) {
+        passes.back()->renderEnd();
+    }
+}
+
+void ShaderPassLink::resize(int width, int height) {
+    _width = width;
+    _height = height;
+}
+
+ShaderPass::ShaderPass(const char *fragmentShaderSource, int width, int height)
     : _impl(std::make_shared<ShaderPassImpl>(fragmentShaderSource, width, height)) {
 }
 
-void cg::ShaderPass::resize(int width, int height) {
+void ShaderPass::resize(int width, int height) {
     _impl->resize(width, height);
 }
 
-void cg::ShaderPass::renderBegin() {
+void ShaderPass::renderBegin() {
     _impl->renderBegin();
 }
 
-void cg::ShaderPass::renderEnd() {
+void ShaderPass::renderEnd() {
     _impl->renderEnd();
+}
+
+void ShaderPass::thenBegin(ShaderPass &next) {
+    _impl->thenBegin(*next._impl);
+}
 }

@@ -19,8 +19,6 @@ cg::Scene &cg::Application::currentScene() {
     return _scene;
 }
 
-using namespace std::chrono_literals;
-
 struct MA {
     constexpr static int MAX = 50;
     std::optional<decltype(std::chrono::steady_clock::now())> tp;
@@ -134,13 +132,13 @@ void cg::Application::start(const ApplicationConfig &config) {
     // main app loop
     initScene();
 
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    glEnable(GL_DEPTH_TEST);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glDepthFunc(GL_LEQUAL);
+//    glEnable(GL_CULL_FACE);
+//    glCullFace(GL_BACK);
 
-    MA frame_ma;
-    int ticks = 0;
     do {
+        glEnable(GL_DEPTH_TEST);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (frameBufferResized) {
@@ -149,12 +147,6 @@ void cg::Application::start(const ApplicationConfig &config) {
         }
         update();
         draw();
-
-        frame_ma.tick();
-        if ((++ticks) % 100 == 0) {
-            printf("average: %lf\n", frame_ma.average());
-            ticks = 0;
-        }
 
         // Swap buffers
         glfwSwapBuffers(_window);

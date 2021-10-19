@@ -87,43 +87,123 @@ void cg::Geometry::mergeGeometry(const cg::Geometry &geo) {
     // TODO support this
 }
 
-cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ) {
-    float halfX = sizeX / 2, halfY = sizeY / 2, halfZ = sizeZ / 2;
-    float positions[] = {
-        -halfX, -halfY, -halfZ,
-        halfX, -halfY, -halfZ,
-        halfX, halfY, -halfZ,
-        -halfX, halfY, -halfZ,
-        -halfX, -halfY, halfZ,
-        halfX, -halfY, halfZ,
-        halfX, halfY, halfZ,
-        -halfX, halfY, halfZ,
+template<int u, int v, int w, int sign>
+void createPlane(float *&positions, float *&normals, unsigned int *&indices, int &index0, float (&sizes)[3],
+                 bool front, bool back) {
+    float half_u = sizes[u] / 2, half_v = sizes[v] / 2, half_w = sign * (sizes[w] / 2);
+    float points[] = {
+        +half_u, +half_v, half_w,
+        -sign * half_u, +sign * half_v, half_w,
+        -half_u, -half_v, half_w,
+        +sign * half_u, -sign * half_v, half_w,
     };
-    float colors[] = {
-        0.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 1.0f,
-        1.0f, 1.0f, 1.0f,
-        0.0f, 1.0f, 1.0f,
+    // +u,+v -> -u,+v -> -u,-v -> +u,-v
+    int offset = 0;
+    for (int i = 0; i < 4; ++i) {
+        positions[u] = points[offset + 0];
+        positions[v] = points[offset + 1];
+        positions[w] = points[offset + 2];
+        positions += 3;
+        offset += 3;
+    }
+    offset = 0;
+    for (int i = 0; i < 4; ++i) {
+        normals[u] = 0.0f;
+        normals[v] = 0.0f;
+        normals[w] = sign;
+        normals += 3;
+    }
+    constexpr int face_indices[] = {
+        0, 1, 2, 0, 2, 3,
+        0, 2, 1, 0, 3, 2,
     };
-    unsigned int indices[] = {
-        0, 1, 2,
-        0, 2, 3,
-        1, 5, 6,
-        1, 6, 2,
-        5, 4, 7,
-        5, 7, 6,
-        4, 0, 3,
-        4, 3, 7,
-        2, 6, 7,
-        2, 7, 3,
-        0, 4, 5,
-        0, 5, 1,
+    if (front) {
+        for (int i = 0; i < 6; ++i) {
+            *(indices++) = index0 + face_indices[i];
+        }
+    }
+    if (back) {
+        for (int i = 6; i < 12; ++i) {
+            *(indices++) = index0 + face_indices[i];
+        }
+    }
+    index0 += 4;
+}
+
+cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ, Side side) {
+    float positions[12 * 6];
+    float normals[12 * 6];
+    unsigned int indices[6 * 6 * 2];
+    constexpr int x = 0, y = 1, z = 2;
+    int index0 = 0;
+    float sizes[] = {sizeX, sizeY, sizeZ};
+    const auto funcs = {
+        createPlane<y, z, x, +1>, // px
+        createPlane<y, z, x, -1>, // nx
+        createPlane<x, y, z, +1>, // pz
+        createPlane<x, y, z, -1>, // nz
+        createPlane<z, x, y, +1>, // py
+        createPlane<z, x, y, -1>, // ny
     };
+    float *ptr_pos = positions, *ptr_norm = normals;
+    unsigned int *ptr_idx = indices;
+    for (auto func : funcs) {
+        func(ptr_pos, ptr_norm, ptr_idx, index0, sizes, side != Side::BackSide, side != Side::FrontSide);
+    }
     addAttribute("position", positions, 3);
-    addAttribute("color", colors, 3);
-    addIndices(indices);
+    addAttribute("normal", normals, 3);
+    if (side == Side::DoubleSide) {
+        addIndices(indices, 72);
+    } else {
+        addIndices(indices, 36);
+    }
+
+//    float positions[] = {
+//        -half_x, -half_y, -half_z,
+//        half_x, -half_y, -half_z,
+//        half_x, half_y, -half_z,
+//        -half_x, half_y, -half_z,
+//        -half_x, -half_y, half_z,
+//        half_x, -half_y, half_z,
+//        half_x, half_y, half_z,
+//        -half_x, half_y, half_z,
+//    };
+//    float normals[] = {
+//    };
+//    float colors[] = {
+//        0.0f, 0.0f, 0.0f,
+//        1.0f, 0.0f, 0.0f,
+//        1.0f, 1.0f, 0.0f,
+//        0.0f, 1.0f, 0.0f,
+//        0.0f, 0.0f, 1.0f,
+//        1.0f, 0.0f, 1.0f,
+//        1.0f, 1.0f, 1.0f,
+//        0.0f, 1.0f, 1.0f,
+//    };
+//    unsigned int indices[] = {
+//        // front side
+//        0, 2, 1, 0, 3, 2,
+//        1, 6, 5, 1, 2, 6,
+//        5, 7, 4, 5, 6, 7,
+//        4, 3, 0, 4, 7, 3,
+//        2, 7, 6, 2, 3, 7,
+//        0, 5, 4, 0, 1, 5,
+//
+//        // back side
+//        0, 1, 2, 0, 2, 3,
+//        1, 5, 6, 1, 6, 2,
+//        5, 4, 7, 5, 7, 6,
+//        4, 0, 3, 4, 3, 7,
+//        2, 6, 7, 2, 7, 3,
+//        0, 4, 5, 0, 5, 1,
+//    };
+//    addAttribute("position", positions, 3);
+//    addAttribute("color", colors, 3);
+//    if (side == Side::FrontSide) {
+//        addIndices(indices, 36);
+//    } else if (side == Side::BackSide) {
+//        addIndices(indices + 36, 36);
+//    } else if (side == Side::DoubleSide) {
+//        addIndices(indices, 72);
+//    }
 }

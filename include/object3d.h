@@ -16,10 +16,10 @@ class Object3D {
     mutable glm::mat4 _model_matrix;
     // position in location coordinates
     glm::vec3 _pos{0.0, 0.0, 0.0};
-    glm::vec3 _target{0.0, 0.0, -1.0};
+    glm::vec3 _dir{0.0, 0.0, -1.0};
+    glm::vec3 _up{0.0, 1.0, 0.0};
 
     // need update
-    mutable bool _need_update = true;
     std::vector<Object3D *> _children;
     Object3D *_parent = nullptr;
 public:
@@ -32,13 +32,12 @@ public:
     Object3D(Object3D &&) = delete;
 
     void updateModelToWorldMatrix() const {
-        _local_matrix = glm::inverse(cg::look_at(glm::vec3{0.0, 1.0, 0.0}, _target, _pos));
+        _local_matrix = glm::inverse(cg::look_at(_up, _dir + _pos, _pos));
         if (_parent) {
             _model_matrix = _parent->modelToWorldMatrix() * _local_matrix;
         } else {
             _model_matrix = _local_matrix;
         }
-        _need_update = false;
     }
 
     glm::vec3 position() const {
@@ -46,21 +45,31 @@ public:
     }
 
     void setPosition(glm::vec3 pos) {
-        _target += pos - _pos;
         _pos = pos;
-        _need_update = true;
     }
 
     void lookAt(glm::vec3 target) {
-        _target = target;
-        _need_update = true;
+        _dir = glm::normalize(target - _pos);
     }
 
     glm::vec3 lookDir() const {
-        return _pos - _target;
+        return _dir;
+    }
+
+    glm::vec3 up() const {
+        return _up;
+    }
+
+    void setUp(glm::vec3 up) {
+        _up = glm::normalize(up);
     }
 
     void addChild(Object3D *obj) {
+        if (obj->_parent == this) return;
+        if (obj->_parent) {
+            obj->_parent->removeChild(obj);
+        }
+        obj->_parent = this;
         _children.push_back(obj);
     }
 
@@ -76,6 +85,7 @@ public:
     Object3D *removeChild(Object3D *obj) {
         auto iter = std::find(std::begin(_children), std::end(_children), obj);
         if (iter != _children.end()) {
+            (*iter)->_parent = nullptr;
             _children.erase(iter);
             return obj;
         }
@@ -83,9 +93,7 @@ public:
     }
 
     glm::mat4 modelToWorldMatrix() const {
-        if (_need_update) {
-            updateModelToWorldMatrix();
-        }
+        updateModelToWorldMatrix();
         return _model_matrix;
     }
 

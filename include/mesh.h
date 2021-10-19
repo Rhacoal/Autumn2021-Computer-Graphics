@@ -16,6 +16,27 @@ public:
 
     cg::Mesh *isMesh() override { return this; }
 
+    Geometry *geometry() {
+        return _geo.get();
+    }
+
+    Material *material() {
+        return _mat.get();
+    }
+
+    void render(Renderer &re, Scene &sc, Camera &ca) override;
+};
+
+class Skybox : public Object3D {
+    std::shared_ptr<SkyboxMaterial> _mat;
+    std::shared_ptr<BoxGeometry> _geo;
+public:
+    Skybox(const char **faces);
+
+    SkyboxMaterial *skyboxMaterial() {
+        return _mat.get();
+    }
+
     void render(Renderer &re, Scene &sc, Camera &ca) override;
 };
 

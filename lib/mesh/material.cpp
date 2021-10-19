@@ -42,9 +42,10 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
     } pointLights[100] = {};
     // only one directional light is tracked
     struct DirectionalLightStruct {
-        glm::vec3 position;
+        glm::vec3 direction;
         glm::vec4 color;
     } dirLights[1] = {};
+    glm::vec4 ambient_color{};
     for (Light *light : pargs.lights) {
         if (light->isPointLight()) {
             auto pointLight = light->isPointLight();
@@ -58,11 +59,17 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
             directional_light_cnt += 1;
             if (directional_light_cnt == 1) {
                 auto dirLight = light->isDirectionalLight();
+                if (random() % 20 == 1) {
+                    auto t = dirLight->lookDir();
+                    printf("%.2f, %.2f, %.2f\n", t.x, t.y, t.z);
+                }
                 dirLights[0] = DirectionalLightStruct{
-                    .position = dirLight->localToWorld(dirLight->position()),
+                    .direction = glm::vec3(dirLight->parentModelToWorldMatrix() * glm::vec4(dirLight->lookDir(), 0.0)),
                     .color = glm::vec4(dirLight->color(), dirLight->intensity()),
                 };
             }
+        } else if (light->isAmbientLight()) {
+            ambient_color = glm::vec4(light->color(), light->intensity());
         }
     }
     cache_key_t key = std::make_tuple(point_light_cnt, directional_light_cnt);
@@ -97,31 +104,29 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
         // TODO cache locations
         for (int i = 0; i < point_light_cnt; ++i) {
             snprintf(name, 256, "pointLights[%d].position", point_light_cnt);
-            glUniform3fv(glGetUniformLocation(sp, name), 1, &pointLights[i].position[0]);
+            shader.setUniform3f(name, pointLights[i].position);
 
             snprintf(name, 256, "pointLights[%d].direction", point_light_cnt);
-            glUniform3fv(glGetUniformLocation(sp, name), 1, &pointLights[i].direction[0]);
+            shader.setUniform3f(name, pointLights[i].direction);
 
             snprintf(name, 256, "pointLights[%d].color", point_light_cnt);
-            glUniform4fv(glGetUniformLocation(sp, name), 1, &pointLights[i].color[0]);
+            shader.setUniform4f(name, pointLights[i].color);
         }
         if (directional_light_cnt) {
-            snprintf(name, 256, "directionalLight[%d].position", point_light_cnt);
-            glUniform3fv(glGetUniformLocation(sp, name), 1, &dirLights[0].position[0]);
-
-            snprintf(name, 256, "directionalLight[%d].color", point_light_cnt);
-            glUniform4fv(glGetUniformLocation(sp, name), 1, &dirLights[0].color[0]);
+            shader.setUniform3f("directionalLight.direction", dirLights[0].direction);
+            shader.setUniform4f("directionalLight.color", dirLights[0].color);
         }
-        glUniform4fv(glGetUniformLocation(sp, "color"), 1, &color[0]);
-        glUniform1f(glGetUniformLocation(sp, "shininess"), shininess);
+        shader.setUniform4f("color", color);
+        shader.setUniform1f("shininess", shininess);
+        shader.setUniform4f("ambientLight", ambient_color);
 
         // bind textures
-        glUniform1i(glGetUniformLocation(sp, "diffuse"), 0);
+        shader.setUniform1i("diffuse", 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, diffuse.has_value() ? diffuse.value().tex() : 0);
 
         // bind camera position
-        glUniform4fv(glGetUniformLocation(sp, "cameraPosition"), 1, &cam.worldPosition()[0]);
+        shader.setUniform3f("cameraPosition", cam.worldPosition());
         return sp;
     }
     return 0;
@@ -138,28 +143,83 @@ void cg::PhongMaterial::updateUniforms(cg::Object3D *object, Camera &camera) {
     glUniformMatrix4fv(glGetUniformLocation(sp, "modelMatrix"), 1, GL_FALSE, &worldMatrix[0][0]);
     auto vMatrix = glm::inverse(camera.modelToWorldMatrix());
     auto pMatrix = camera.projectionMatrix();
-    // todo remove debug
     auto mvpMatrix = pMatrix * vMatrix * worldMatrix;
-    auto zero = mvpMatrix * glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    auto x = homo(mvpMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    auto y = homo(mvpMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-    auto z = homo(mvpMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
-
-    float halfX = 0.5f, halfY = 0.5f, halfZ = 0.5f;
-    float positions[] = {
-        -halfX, -halfY, -halfZ,
-        halfX, -halfY, -halfZ,
-        halfX, halfY, -halfZ,
-        -halfX, halfY, -halfZ,
-        -halfX, -halfY, halfZ,
-        halfX, -halfY, halfZ,
-        halfX, halfY, halfZ,
-        -halfX, halfY, halfZ,
-    };
-    glm::vec4 tet[8];
-    for (int i = 0; i < 8; ++i) {
-        tet[i] = homo(mvpMatrix * glm::vec4(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 1.0f));
-    }
-//    auto mvpMatrix = modelToWorldMatrix;
     glUniformMatrix4fv(glGetUniformLocation(sp, "mvpMatrix"), 1, GL_FALSE, &mvpMatrix[0][0]);
 }
+
+const char *skybox_vert = R"(
+#version 330 core
+layout (location = 0) in vec3 position;
+out vec3 texCoord;
+uniform mat4 vpMatrix;
+void main() {
+    texCoord = position;
+    vec4 pos = vpMatrix * vec4(position, 1.0);
+    gl_Position = pos.xyww;
+}
+)";
+
+const char *skybox_frag = R"(
+#version 330 core
+out vec4 fragColor;
+in vec3 texCoord;
+uniform samplerCube skybox;
+void main() {
+    fragColor = texture(skybox, texCoord);
+//    fragColor = texture(skybox, vec3(0.5, 0.5, 0.2));
+//    fragColor = vec4(1.0);
+}
+)";
+
+GLuint cg::SkyboxMaterial::useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) noexcept {
+    if (!shader.id) {
+        shader = Shader(skybox_vert, skybox_frag);
+    }
+    shader.use();
+    shader.setUniform1i("skybox", 0);
+    const auto printMatrix = [](const glm::mat4 &mat) {
+        puts("[");
+        for (int i = 0; i < 4; ++i) {
+            printf("%f %f %f %f\n", mat[i][0], mat[i][1], mat[i][2], mat[i][3]);
+        }
+        puts("]");
+    };
+    auto v0Matrix = camera.viewMatrix();
+//    printMatrix(v0Matrix);
+    auto vMatrix = glm::mat4(glm::mat3(camera.viewMatrix()));
+//    printMatrix(vMatrix);
+    auto pMatrix = camera.projectionMatrix();
+    auto vpMatrix = pMatrix * vMatrix;
+//    auto vpMatrix = pMatrix * v0Matrix;
+    shader.setUniformMatrix4("vpMatrix", vpMatrix);
+
+//    auto zero = vpMatrix * glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+//    auto x = homo(vMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+//    auto y = homo(vMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+//    auto z = homo(vMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+//
+//    float halfX = 1.0f, halfY = 1.0f, halfZ = 1.0f;
+//    float positions[] = {
+//        -halfX, -halfY, -halfZ,
+//        halfX, -halfY, -halfZ,
+//        halfX, halfY, -halfZ,
+//        -halfX, halfY, -halfZ,
+//        -halfX, -halfY, halfZ,
+//        halfX, -halfY, halfZ,
+//        halfX, halfY, halfZ,
+//        -halfX, halfY, halfZ,
+//    };
+//    glm::vec4 tet[8];
+//    for (int i = 0; i < 8; ++i) {
+//        tet[i] = homo(vpMatrix * glm::vec4(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 1.0f));
+//        printf("(%.2f, %.2f, %.2f) -> (%.2f, %.2f, %.2f)\n",
+//               positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+//               tet[i].x, tet[i].y, tet[i].z);
+//    }
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.has_value() ? skybox->tex() : 0);
+    return shader.id;
+}
+
+void cg::SkyboxMaterial::updateUniforms(cg::Object3D *object, cg::Camera &camera) {}
