@@ -7,6 +7,8 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <vector>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace cg {
 
@@ -72,7 +74,13 @@ public:
     void lookAt(glm::vec3 target) {
         glm::vec3 t = target, p = _pos;
         auto lookAtMat = cg::look_at(_up, t, p);
-        _quat = glm::quat_cast(lookAtMat);
+//        lookAtMat;
+//        util::printMatrix(lookAtMat);
+        _quat = glm::conjugate(glm::quat_cast(lookAtMat));
+//        util::printVec(glm::translate(glm::mat4_cast(glm::conjugate(_quat)), p) * glm::vec4(1.0));
+//        util::printVec(glm::translate(glm::mat4_cast(glm::conjugate(_quat)), -p) * glm::vec4(1.0));
+//        util::printVec(glm::mat4_cast(_quat) * glm::vec4(1.0));
+//        util::printVec(lookAtMat * glm::vec4(1.0));
         invalidateMatrix();
 
         _dir = glm::normalize(target - _pos);

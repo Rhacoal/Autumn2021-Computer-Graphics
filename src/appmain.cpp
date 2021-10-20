@@ -123,7 +123,8 @@ public:
 
         // camera
         camera.setPosition(glm::vec3(5.0f, 5.0f, 5.0f));
-        camera.lookAt(glm::vec3(0.0f));
+        puts("camera: ");
+        camera.lookAt(glm::vec3(0.0f, 0.0f, 0.0f));
 
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();

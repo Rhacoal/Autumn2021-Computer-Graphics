@@ -59,10 +59,6 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
             directional_light_cnt += 1;
             if (directional_light_cnt == 1) {
                 auto dirLight = light->isDirectionalLight();
-                if (random() % 20 == 1) {
-                    auto t = dirLight->lookDir();
-                    printf("%.2f, %.2f, %.2f\n", t.x, t.y, t.z);
-                }
                 dirLights[0] = DirectionalLightStruct{
                     .direction = glm::vec3(dirLight->parentModelMatrix() * glm::vec4(dirLight->lookDir(), 0.0)),
                     .color = glm::vec4(dirLight->color(), dirLight->intensity()),
@@ -100,7 +96,6 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
     if (sp) {
         glUseProgram(sp);
         char name[256];
-        GLint loc;
         // TODO cache locations
         for (int i = 0; i < point_light_cnt; ++i) {
             snprintf(name, 256, "pointLights[%d].position", point_light_cnt);
@@ -145,30 +140,30 @@ void cg::PhongMaterial::updateUniforms(cg::Object3D *object, Camera &camera) {
     auto pMatrix = camera.projectionMatrix();
     auto mvpMatrix = pMatrix * vMatrix * modelMatrix;
 
-
-    auto zero = mvpMatrix * glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    auto x = homo(vMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    auto y = homo(vMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-    auto z = homo(vMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
-
-    float halfX = 1.0f, halfY = 1.0f, halfZ = 1.0f;
-    float positions[] = {
-        -halfX, -halfY, -halfZ,
-        halfX, -halfY, -halfZ,
-        halfX, halfY, -halfZ,
-        -halfX, halfY, -halfZ,
-        -halfX, -halfY, halfZ,
-        halfX, -halfY, halfZ,
-        halfX, halfY, halfZ,
-        -halfX, halfY, halfZ,
-    };
-    glm::vec4 tet[8];
-    for (int i = 0; i < 8; ++i) {
-        tet[i] = homo(vMatrix * glm::vec4(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 1.0f));
-        printf("(%.2f, %.2f, %.2f) -> (%.2f, %.2f, %.2f)\n",
-               positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
-               tet[i].x, tet[i].y, tet[i].z);
-    }
+//    auto zero = mvpMatrix * glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+//    auto x = homo(vMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+//    auto y = homo(vMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+//    auto z = homo(vMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+//
+//    float halfX = 1.0f, halfY = 1.0f, halfZ = 1.0f;
+//    float positions[] = {
+//        -halfX, -halfY, -halfZ,
+//        halfX, -halfY, -halfZ,
+//        halfX, halfY, -halfZ,
+//        -halfX, halfY, -halfZ,
+//        -halfX, -halfY, halfZ,
+//        halfX, -halfY, halfZ,
+//        halfX, halfY, halfZ,
+//        -halfX, halfY, halfZ,
+//    };
+//    glm::vec4 tet[8];
+//    for (int i = 0; i < 8; ++i) {
+//        tet[i] = homo(vMatrix * glm::vec4(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 1.0f));
+//        printf("(%.2f, %.2f, %.2f) -> (%.2f, %.2f, %.2f)\n",
+//               positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+//               tet[i].x, tet[i].y, tet[i].z);
+//    }
+//    exit(0);
 
     glUniformMatrix4fv(glGetUniformLocation(sp, "mvpMatrix"), 1, GL_FALSE, &mvpMatrix[0][0]);
 }
@@ -203,45 +198,11 @@ GLuint cg::SkyboxMaterial::useShaderProgram(Scene &scene, Camera &camera, Progra
     }
     shader.use();
     shader.setUniform1i("skybox", 0);
-    const auto printMatrix = [](const glm::mat4 &mat) {
-        puts("[");
-        for (int i = 0; i < 4; ++i) {
-            printf("%f %f %f %f\n", mat[i][0], mat[i][1], mat[i][2], mat[i][3]);
-        }
-        puts("]");
-    };
     auto v0Matrix = camera.viewMatrix();
-//    printMatrix(v0Matrix);
     auto vMatrix = glm::mat4(glm::mat3(camera.viewMatrix()));
-//    printMatrix(vMatrix);
     auto pMatrix = camera.projectionMatrix();
     auto vpMatrix = pMatrix * vMatrix;
-//    auto vpMatrix = pMatrix * v0Matrix;
     shader.setUniformMatrix4("vpMatrix", vpMatrix);
-
-//    auto zero = vpMatrix * glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-//    auto x = homo(vMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-//    auto y = homo(vMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-//    auto z = homo(vMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
-//
-//    float halfX = 1.0f, halfY = 1.0f, halfZ = 1.0f;
-//    float positions[] = {
-//        -halfX, -halfY, -halfZ,
-//        halfX, -halfY, -halfZ,
-//        halfX, halfY, -halfZ,
-//        -halfX, halfY, -halfZ,
-//        -halfX, -halfY, halfZ,
-//        halfX, -halfY, halfZ,
-//        halfX, halfY, halfZ,
-//        -halfX, halfY, halfZ,
-//    };
-//    glm::vec4 tet[8];
-//    for (int i = 0; i < 8; ++i) {
-//        tet[i] = homo(vpMatrix * glm::vec4(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 1.0f));
-//        printf("(%.2f, %.2f, %.2f) -> (%.2f, %.2f, %.2f)\n",
-//               positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
-//               tet[i].x, tet[i].y, tet[i].z);
-//    }
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.has_value() ? skybox->tex() : 0);

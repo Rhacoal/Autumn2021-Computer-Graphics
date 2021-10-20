@@ -26,6 +26,8 @@ public:
 
     Material(Material &&) = delete;
 
+    virtual bool canInstance() const { return false; }
+
     /**
      * Called before switching to this shader program. This method is called only once per frame for all objects sharing
      * this same material.
@@ -59,7 +61,7 @@ public:
 
 template<typename M>
 class InstancedMaterial : public M {
-
+    // TODO
 };
 
 class PhongMaterial : public Material {
@@ -72,6 +74,8 @@ public:
     glm::float32 shininess;
 
     PhongMaterial() : color(1.0f), shininess(1.0f) {}
+
+    bool canInstance() const override { return true; }
 
     GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) noexcept override;
 

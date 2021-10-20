@@ -54,6 +54,25 @@ template<typename T, size_t N>
 constexpr size_t arraySize(T (&arr)[N]) {
     return N;
 }
+
+inline void printMatrix(const glm::mat4& mat) {
+    puts("[");
+    for (int i = 0; i < 4; ++i) {
+        printf("%f %f %f %f\n", mat[i][0], mat[i][1], mat[i][2], mat[i][3]);
+    }
+    puts("]");
+}
+
+template<typename T>
+inline void printVec(T t) {
+    if constexpr (t.length() >= 3) {
+        printf("%f %f %f", t[0], t[1], t[2]);
+    }
+    if constexpr (t.length() >= 4) {
+        printf(" %f", t[3]);
+    }
+    puts("");
+}
 }
 }
 #endif //ASSIGNMENT_CG_COMMON_H

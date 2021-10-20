@@ -39,6 +39,10 @@ in vec3 vNormal;
 out vec4 fragColor;
 
 void main() {
+#if USE_INSTANCE
+    mat4 mvpMatrix = mvpMatrices[gl_InstanceID];
+    mat4 modelMatrix = mvpMatrices[gl_InstanceID];
+#endif
     vec3 result = vec3(0.0);
 
     vec4 diffuseColor = texture(diffuse, vUv);
@@ -50,7 +54,7 @@ void main() {
     vec3 H = normalize(L + V);
     vec3 N = normalize(vNormal);
 
-    float spec = pow(clamp(dot(N, H), 0.0, 1.0), shininess);
+    float spec = clamp(dot(N, L), 0.0, 1.0) * pow(clamp(dot(N, H), 0.0, 1.0), shininess);
     result += (spec * directionalLight.color.rgb * directionalLight.color.a);
 #endif
     result.rgb += ambientLight.rgb * ambientLight.a;

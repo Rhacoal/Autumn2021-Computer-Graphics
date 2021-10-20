@@ -26,10 +26,10 @@ void cg::decompose(const glm::mat4 &mat, glm::vec3 &position, glm::quat &quat, g
         glm::vec3(mat[2]) / sz,
     };
 
-    quat = glm::quat_cast(rotation);
+    quat = glm::conjugate(glm::quat_cast(rotation));
 }
 
 void cg::compose(glm::mat4 &mat, const glm::vec3 &position, const glm::quat &quat, const glm::vec3 &scale) {
-    auto rot = glm::toMat4(quat);
-    mat = glm::scale(glm::translate(glm::mat4(1.0f), -position) * rot, scale);
+    auto rot = glm::mat4_cast(glm::conjugate(quat));
+    mat = glm::scale(glm::translate(rot, -position), scale);
 }
