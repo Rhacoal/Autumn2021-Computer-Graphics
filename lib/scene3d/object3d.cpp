@@ -33,3 +33,7 @@ void cg::compose(glm::mat4 &mat, const glm::vec3 &position, const glm::quat &qua
     auto rot = glm::mat4_cast(glm::conjugate(quat));
     mat = glm::scale(glm::translate(rot, -position), scale);
 }
+
+bool cg::BoundingBox::intersect(const BoundingBox &b) const {
+    return (x0 <= b.x1 && x1 >= b.x0) && (y0 <= b.y1 && y1 >= b.y0) && (z0 <= b.z1 && z1 >= b.z0);
+}

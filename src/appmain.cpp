@@ -5,11 +5,13 @@
 #include <geometry.h>
 #include <mesh.h>
 #include <lighting.h>
+#include <obj_loader.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <perlin_noise.hpp>
+#include <tinyfiledialogs.h>
 
 using namespace cg;
 
@@ -48,7 +50,7 @@ void main() {
 
 Geometry *generateRandomGround(int segs, float xSize, float zSize, float yScale) {
     siv::BasicPerlinNoise<float> perlin;
-    float points[(segs + 1) * (segs + 1) * 3];
+    auto *points = new float[(segs + 1) * (segs + 1) * 3];
     for (int i = 0; i <= segs; ++i) {
         float x = float(i) * 1.0f / xSize;
         for (int j = 0; j <= segs; ++j) {
@@ -60,48 +62,57 @@ Geometry *generateRandomGround(int segs, float xSize, float zSize, float yScale)
             points[index * 3 + 2] = z - zSize / 2;
         }
     }
-    unsigned int indices[segs * segs * 3];
+    auto *indices = new unsigned int[segs * segs * 3];
     for (int i = 0; i < segs; ++i) {
         for (int j = 0; j < segs; ++j) {
             // TODO generate terrain
         }
     }
+    delete[] points;
+    delete[] indices;
     return nullptr;
 }
 
 class AppMain : public cg::Application {
+    inline static AppMain *appMain = nullptr;
     Renderer renderer;
     PerspectiveCamera camera;
-    std::optional<ShaderPass> trivial, invert, gray, gamma_correction;
+    std::optional<ShaderPass> invert, gray, gammaCorrection;
     std::optional<ShaderPassLink> shaderPasses;
-
 
     // objects
     Skybox *skybox = nullptr;
-    DirectionalLight *dir_light;
-public:
-    static constexpr float camera_dist = 4.0f / 1.414f;
+    DirectionalLight *dirLight;
+    Object3D *loadedObject = nullptr;
+    Mesh *highlightObject = nullptr;
 
-    AppMain() : camera(45, .1, 100, 16 / 9.0f) {}
+    // mouse
+    double lastMouseX = .0, lastMouseY = .0;
+    double deltaX = .0, deltaY = .0;
+    bool hasMouseMove = false;
+    bool showCursor = false;
+    bool rightButtonClicked = false;
+
+    // shoot object
+    Mesh *bullet = nullptr;
+    int bulletLife = 0;
+    static constexpr float bulletSpeed = 5 / 60.f;
+    static constexpr int bulletMaxLife = 60 * 60;
+public:
+    static constexpr float camera_dist = 4.f / 1.414f;
+
+    AppMain() : camera(45, .1, 500, 16 / 9.f) {
+        if (appMain) {
+            throw std::runtime_error("this application should be run in singleton mode!");
+        }
+        appMain = this;
+    }
 
     void initScene() override {
-        // objects
-        auto phong = std::make_shared<PhongMaterial>();
-        phong->color = glm::vec4(1.0f, 0.5f, 0.5f, 1.0f);
-        Mesh *box = new Mesh(phong, std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
-
-        auto phong2 = std::make_shared<PhongMaterial>();
-        Mesh *box2 = new Mesh(phong2, std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
-        phong2->color = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f);
-        box2->setPosition(glm::vec3(1.0f, 0.0f, 0.0f));
-
-        currentScene().addChild(box);
-        currentScene().addChild(box2);
-
         // post effect
         invert.emplace(inverse_frag, windowWidth(), windowHeight());
         gray.emplace(gray_frag, windowWidth(), windowHeight());
-        gamma_correction.emplace(gamma_correction_frag, windowWidth(), windowHeight());
+        gammaCorrection.emplace(gamma_correction_frag, windowWidth(), windowHeight());
         shaderPasses.emplace(windowWidth(), windowHeight());
 
         // skybox
@@ -117,14 +128,44 @@ public:
         currentScene().addChild(skybox);
 
         // lighting
-        currentScene().addChild(new AmbientLight(glm::vec3(1.0f, 1.0f, 1.0f), .0f));
-        dir_light = new DirectionalLight(glm::vec3(0.45f, -0.48f, 0.75f), glm::vec3(1.0f, 1.0f, 1.0f), .9f);
-        currentScene().addChild(dir_light);
+        currentScene().addChild(new AmbientLight(glm::vec3(1.0f, 1.0f, 1.0f), .1f));
+        dirLight = new DirectionalLight(glm::vec3(0.45f, -0.48f, 0.75f), glm::vec3(1.0f, 1.0f, 1.0f), 2.f);
+        currentScene().addChild(dirLight);
 
         // camera
-        camera.setPosition(glm::vec3(5.0f, 5.0f, 5.0f));
-        puts("camera: ");
-        camera.lookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+        camera.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+        camera.lookAt(glm::vec3(-1.0f, 0.0f, -1.0f));
+
+        // bullet
+        bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
+
+        // control
+        glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetCursorPosCallback(window(), [](GLFWwindow *, double mouseX, double mouseY) {
+            auto &app = *appMain;
+            if (app.showCursor) {
+                app.hasMouseMove = false;
+                app.lastMouseX = mouseX;
+                app.lastMouseY = mouseY;
+                return;
+            }
+            if (!app.hasMouseMove) {
+                app.lastMouseX = mouseX;
+                app.lastMouseY = mouseY;
+                app.hasMouseMove = true;
+            }
+            app.deltaX = mouseX - app.lastMouseX;
+            app.deltaY = mouseY - app.lastMouseY;
+            app.lastMouseX = mouseX;
+            app.lastMouseY = mouseY;
+        });
+        glfwSetMouseButtonCallback(window(), [](GLFWwindow *, int button, int action, int mods) {
+            printf("click %d %d\n", button, action);
+            if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
+                puts("rclicked");
+                appMain->rightButtonClicked = true;
+            }
+        });
 
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
@@ -149,13 +190,13 @@ public:
         static std::vector<ShaderPass *> passes;
         if (use_skybox) {
             currentScene().addChild(skybox);
-        } else if (!use_skybox) {
+        } else {
             currentScene().removeChild(skybox);
         }
         passes.clear();
         if (use_invert) passes.emplace_back(&invert.value());
         if (use_gray) passes.emplace_back(&gray.value());
-        if (use_gamma) passes.emplace_back(&gamma_correction.value());
+        if (use_gamma) passes.emplace_back(&gammaCorrection.value());
         shaderPasses->usePasses(passes.begin(), passes.end());
 
         shaderPasses->renderBegin();
@@ -171,7 +212,39 @@ public:
             static float clear_color[3]{};
 
             ImGui::Begin("Assignment 2");
-
+            if (ImGui::Button("load scene...")) {
+                static constexpr const char *filter[] = {"*.json"};
+                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
+                if (path) {
+                    auto obj = loadJsonScene(path);
+                    if (!obj) {
+                        char buf[1024];
+                        snprintf(buf, 1024, "Failed to load scene file: %s", path);
+                        tinyfd_messageBox("Load Scene", buf, "ok", "error", 1);
+                    } else {
+                        if (loadedObject) {
+                            currentScene().removeChild(loadedObject);
+                            delete loadedObject;
+                            highlightObject = nullptr;
+                        }
+                        loadedObject = obj;
+                        currentScene().addChild(obj);
+                    }
+                }
+            }
+//
+//            if (ImGui::Button("create bounding box")) {
+//                currentScene().traverse([&](Object3D &obj) {
+//                    Mesh *mesh = obj.isMesh();
+//                    if (!mesh) return;
+//                    auto box = mesh->computeBoundingBox();
+//                    Mesh* bbox = new Mesh(std::make_shared<PhongMaterial>(),std::make_shared<BoxGeometry>(box.x1 - box.x0, box.y1 - box.y0, box.z1 - box.z0));
+//                    bbox->material()->color = glm::vec4(0.0, 0.0, 1.0, 0.3);
+//                    bbox->setPosition(glm::vec3{box.x1 + box.x0, box.y1 + box.y0, box.z1 + box.z0} / 2.0f);
+//                    currentScene().addChild(bbox);
+//                });
+//            }
+//
             ImGui::Text("filters");
 
             ImGui::Checkbox("invert color", &use_invert);
@@ -181,9 +254,10 @@ public:
             ImGui::Text("options");
             ImGui::Checkbox("skybox", &use_skybox);
 
+            ImGui::Text("mouse: (%.2f, %.2f)", lastMouseX, lastMouseY);
             ImGui::Text("average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
-            ImGui::Text("camera (%.2f, %.2f, %.2f) looking to (%.2f, %.2f, %.2f)",
+            ImGui::Text("camera: pos(%.2f, %.2f, %.2f) dir(%.2f, %.2f, %.2f)",
                         camera.position().x, camera.position().y, camera.position().z,
                         camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
             ImGui::End();
@@ -197,14 +271,8 @@ public:
         shaderPasses->resize(width, height);
     }
 
-    void update() override {
-        static int cnt = 0;
-//        cnt = (cnt + 1) % 360;
-//        double theta = cnt / 180.0 * math::pi();
-//        camera.setPosition(glm::vec3(cos(theta) * camera_dist, camera_dist, sin(theta) * camera_dist));
-//        camera.lookAt(glm::vec3(0.0f, 0.0f, 0.0f));
-        constexpr float cameraSpeed = 0.05f; // adjust accordingly
-//        camera.setUp(glm::vec3(0.0f, 1.0f, 1.0f));
+    void updateCamera() {
+        constexpr float cameraSpeed = 0.2f;
         const auto up = camera.up(); // +y
         const auto dir = glm::normalize(camera.lookDir());
         const auto right = glm::normalize(glm::cross(dir, up)); // -x
@@ -235,16 +303,14 @@ public:
         if (glfwGetKey(window(), GLFW_KEY_Q) == GLFW_PRESS) { // up
             camera.setPosition(camera.position() + cameraSpeed * up);
         }
-        if (glfwGetKey(window(), GLFW_KEY_E) == GLFW_PRESS) { // down
+        if (glfwGetKey(window(), GLFW_KEY_Z) == GLFW_PRESS) { // down
             camera.setPosition(camera.position() - cameraSpeed * up);
         }
 
         if (glfwGetKey(window(), GLFW_KEY_UP) == GLFW_PRESS) { // pitch up
-            printf("%f\n", glm::degrees(pitch));
             pitch = std::max(cameraMinPitch, pitch + cameraPitchSpeed);
         }
         if (glfwGetKey(window(), GLFW_KEY_DOWN) == GLFW_PRESS) { // pitch down
-            printf("%f\n", glm::degrees(pitch));
             pitch = std::min(cameraMaxPitch, pitch - cameraPitchSpeed);
         }
         if (glfwGetKey(window(), GLFW_KEY_LEFT) == GLFW_PRESS) { // yaw left
@@ -253,13 +319,117 @@ public:
         if (glfwGetKey(window(), GLFW_KEY_RIGHT) == GLFW_PRESS) { // yaw right
             yaw -= cameraYawSpeed;
         }
-//        printf("%f, %f\n", yaw, pitch);
         glm::vec3 direction;
         direction.x = cos(yaw) * sin(pitch);
         direction.y = cos(pitch);
         direction.z = sin(yaw) * sin(pitch);
         direction = worldToCamera * direction;
         camera.lookAt(camera.position() + direction);
+    }
+
+    void updateMouse() {
+        if (hasMouseMove && (abs(deltaX) > 1e-2 || abs(deltaY) > 1e-2)) {
+            deltaX /= windowWidth();
+            deltaY /= windowHeight();
+            const auto up = camera.up(); // +y
+            const auto dir = glm::normalize(camera.lookDir());
+            const auto right = glm::normalize(glm::cross(dir, up)); // -x
+            const auto left = -right; // +x
+            const auto front = glm::normalize(glm::cross(up, right)); // -x
+            const auto back = -front; // +z
+            glm::mat3 worldToCamera{left, up, back};
+            glm::mat3 cameraToWorld = glm::inverse(worldToCamera);
+
+            constexpr float cameraPitchSpeed = math::radians(-90);
+            constexpr float cameraYawSpeed = math::radians(180);
+            constexpr float cameraMinPitch = math::radians(10), cameraMaxPitch = math::radians(170);
+            float pitch = acos(glm::dot(up, glm::normalize(dir))); // [0, 180)
+            const auto projection = cameraToWorld * (dir - glm::dot(dir, up) * up);
+
+            float yaw = atan2(projection.z, projection.x);
+            pitch = std::clamp(pitch - (float) deltaY * cameraPitchSpeed, cameraMinPitch, cameraMaxPitch);
+            yaw -= cameraYawSpeed * (float) deltaX;
+            glm::vec3 direction;
+            direction.x = cos(yaw) * sin(pitch);
+            direction.y = cos(pitch);
+            direction.z = sin(yaw) * sin(pitch);
+            direction = worldToCamera * direction;
+            camera.lookAt(camera.position() + direction);
+
+            deltaX = deltaY = 0.0;
+        }
+        if (rightButtonClicked) {
+            double mouse_x = showCursor ? lastMouseX : windowWidth() / 2.0;
+            double mouse_y = showCursor ? lastMouseY : windowHeight() / 2.0;
+            double x = (mouse_x / windowWidth()) * 2.0 - 1.0;
+            double y = (mouse_y / windowHeight()) * -2.0 + 1.0;
+            double z = -1.0;
+            auto wpos = glm::inverse(camera.projectionMatrix() * camera.viewMatrix()) * glm::vec4(x, y, z, 1.0f);
+            auto world_pos = glm::vec3(wpos / wpos.w);
+            util::printVec(world_pos);
+            auto dir = glm::normalize(world_pos - camera.worldPosition());
+            util::printVec(dir);
+            bullet->setPosition(camera.worldPosition() + dir * 5.0f);
+            bullet->lookToDir(dir);
+            currentScene().addChild(bullet);
+            bulletLife = bulletMaxLife;
+            rightButtonClicked = false;
+        }
+        // update showCursor here since delta would not be have been calculated until next udpate
+        if (glfwGetKey(window(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
+            glfwGetKey(window(), GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
+            if (!showCursor) {
+                glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                glfwSetCursorPos(window(), windowWidth() / 2.0, windowHeight() / 2.0);
+                showCursor = true;
+            }
+        } else {
+            if (showCursor) {
+                glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                showCursor = false;
+            }
+        }
+    }
+
+    void setHighlightObject(Mesh *mesh) {
+        static glm::vec4 prevColor{};
+        if (highlightObject == mesh) { return; }
+        if (highlightObject) {
+            highlightObject->material()->color = prevColor;
+        }
+        highlightObject = mesh;
+        if (!mesh) { return; }
+        prevColor = mesh->material()->color;
+        mesh->material()->color = glm::vec4{2.0f, 0.3f, 0.3f, 1.0f};
+    }
+
+    void updateBullet() {
+        if (bullet && bulletLife > 0) {
+            bulletLife -= 1;
+            if (bulletLife == 0) {
+                currentScene().removeChild(bullet);
+                return;
+            }
+            bullet->setPosition(bullet->position() + bullet->lookDir() * bulletSpeed);
+            auto bullet_bounding = bullet->computeBoundingBox();
+            Mesh *selected = nullptr;
+            currentScene().traverse([&](Object3D &obj) {
+                Mesh *mesh = obj.isMesh();
+                if (!mesh || mesh == bullet) return;
+                auto mesh_bounding = mesh->computeBoundingBox();
+                if (mesh_bounding.intersect(bullet_bounding)) {
+                    selected = mesh;
+                }
+            });
+            setHighlightObject(selected);
+        }
+    }
+
+    void update() override {
+        auto &io = ImGui::GetIO();
+        updateCamera();
+        updateMouse();
+        updateBullet();
     }
 
     void cleanUp() override {
@@ -273,8 +443,8 @@ int main() {
     AppMain app;
     app.start(cg::ApplicationConfig{
         .window =  {
-            .width = 800, .height = 450,
-            .title = "test"
+            .width = 1024, .height = 576,
+            .title = "Assignment 2"
         }
     });
     return 0;

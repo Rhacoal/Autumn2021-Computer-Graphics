@@ -20,7 +20,7 @@ struct ApplicationConfig {
 };
 
 class Application {
-    std::map<std::string, Texture> _managed_textures;
+    static std::map<std::string, Texture> _managed_textures;
     GLFWwindow *_window{};
     volatile int _running = 1;
     int started = 0;
@@ -57,7 +57,7 @@ public:
 
     bool running() const { return _running; }
 
-    Texture loadTexture(const char *path);
+    static Texture loadTexture(const char *path);
 };
 }
 

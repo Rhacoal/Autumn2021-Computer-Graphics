@@ -18,8 +18,45 @@ void decompose(const glm::mat4 &mat, glm::vec3 &position, glm::quat &quat, glm::
 
 void compose(glm::mat4 &mat, const glm::vec3 &position, const glm::quat &quat, const glm::vec3 &scale);
 
+struct BoundingBox {
+    float x0, y0, z0;
+    float x1, y1, z1;
+
+    explicit BoundingBox(glm::vec3 vec) {
+        x0 = x1 = vec.x;
+        y0 = y1 = vec.y;
+        z0 = z1 = vec.z;
+    }
+
+    explicit BoundingBox(float x, float y, float z) {
+        x0 = x1 = x;
+        y0 = y1 = y;
+        z0 = z1 = z;
+    }
+
+    void addPoint(float x, float y, float z) {
+        static constexpr auto minmax = [](float &min_v, float &max_v, float v) {
+            if (v < min_v) {
+                min_v = v;
+            } else if (v > max_v) {
+                max_v = v;
+            }
+        };
+        minmax(x0, x1, x);
+        minmax(y0, y1, y);
+        minmax(z0, z1, z);
+    }
+
+    void addPoint(glm::vec3 vec) {
+        addPoint(vec.x, vec.y, vec.z);
+    }
+
+    bool intersect(const BoundingBox &b) const;
+};
+
 // 3d objects, y-up
 class Object3D {
+    inline static int latest_id = 1;
     mutable glm::mat4 _local_matrix;
     mutable glm::mat4 _world_matrix;
     mutable bool _need_update = true;
@@ -29,14 +66,14 @@ class Object3D {
     glm::quat _quat;
     glm::vec3 _scale{1.0f, 1.0f, 1.0f};
 
-    glm::vec3 _dir{0.0f, 0.0f, -1.0f};
-
     glm::vec3 _up{0.0f, 1.0f, 0.0f};
 
     std::vector<Object3D *> _children;
     Object3D *_parent = nullptr;
 public:
-    Object3D() {
+    const int id;
+
+    Object3D() : id(latest_id++) {
         setLocalMatrix(glm::mat4(1.0f));
     }
 
@@ -62,6 +99,11 @@ public:
         invalidateMatrix();
     }
 
+    void applyRotation(glm::quat quat) {
+        _quat = quat * _quat;
+        invalidateMatrix();
+    }
+
     void invalidateMatrix(bool force = false) {
         if (!_need_update || force) {
             _need_update = true;
@@ -74,20 +116,23 @@ public:
     void lookAt(glm::vec3 target) {
         glm::vec3 t = target, p = _pos;
         auto lookAtMat = cg::look_at(_up, t, p);
-//        lookAtMat;
-//        util::printMatrix(lookAtMat);
         _quat = glm::conjugate(glm::quat_cast(lookAtMat));
-//        util::printVec(glm::translate(glm::mat4_cast(glm::conjugate(_quat)), p) * glm::vec4(1.0));
-//        util::printVec(glm::translate(glm::mat4_cast(glm::conjugate(_quat)), -p) * glm::vec4(1.0));
-//        util::printVec(glm::mat4_cast(_quat) * glm::vec4(1.0));
-//        util::printVec(lookAtMat * glm::vec4(1.0));
         invalidateMatrix();
+    }
 
-        _dir = glm::normalize(target - _pos);
+    void lookToDir(glm::vec3 dir) {
+        lookAt(_pos + dir);
     }
 
     glm::vec3 lookDir() const {
-        return _dir;
+        if (_need_update) {
+            updateWorldMatrix();
+        }
+        return glm::normalize(glm::vec3(glm::inverse(_local_matrix) * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}));
+    }
+
+    glm::vec3 lookDirWorld() const {
+        return glm::normalize(glm::vec3(glm::inverse(worldMatrix()) * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}));
     }
 
     glm::vec3 up() const {
@@ -115,6 +160,10 @@ public:
 
     const std::vector<Object3D *> &children() const {
         return _children;
+    }
+
+    Object3D *parent() const {
+        return _parent;
     }
 
     glm::vec3 localToWorld(glm::vec3 pos) {
@@ -164,7 +213,7 @@ public:
     virtual void render(Renderer &renderer, Scene &scene, Camera &camera) {}
 
     template<typename T>
-    void traverse(const T &func) {
+    void traverse(T &&func) {
         func(*this);
         for (auto *child : _children) {
             child->traverse(func);

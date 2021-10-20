@@ -1,10 +1,12 @@
 #ifndef ASSIGNMENT_MESH_H
 #define ASSIGNMENT_MESH_H
 
-#include <object3d.h>
 #include <cg_fwd.h>
+#include <object3d.h>
+
 #include <memory>
 #include <utility>
+#include <optional>
 
 namespace cg {
 class Mesh : public Object3D {
@@ -23,6 +25,8 @@ public:
     Material *material() {
         return _mat.get();
     }
+
+    BoundingBox computeBoundingBox() const;
 
     void render(Renderer &re, Scene &sc, Camera &ca) override;
 };

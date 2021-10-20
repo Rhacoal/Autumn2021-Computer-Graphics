@@ -19,6 +19,7 @@ class Material {
     static int latest_id;
 public:
     const int id;
+    glm::vec4 color{1.0f};
 
     Material() : id(latest_id++) {}
 
@@ -70,10 +71,9 @@ class PhongMaterial : public Material {
 public:
     Shader shader;
     std::optional<Texture> diffuse = Texture::defaultTexture(DefaultTexture::WHITE);
-    glm::vec4 color;
     glm::float32 shininess;
 
-    PhongMaterial() : color(1.0f), shininess(1.0f) {}
+    PhongMaterial() : shininess(1.0f) {}
 
     bool canInstance() const override { return true; }
 

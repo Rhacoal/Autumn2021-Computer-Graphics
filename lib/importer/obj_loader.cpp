@@ -4,16 +4,21 @@
 #include <mesh.h>
 #include <geometry.h>
 #include <material.h>
+#include <application.h>
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <json.hpp>
 
 #include <vector>
 #include <regex>
 #include <optional>
 #include <functional>
 #include <map>
+#include <fstream>
+
+using namespace cg;
 
 static std::vector<std::string> split(const std::string &str, const std::regex &delim) {
     // https://stackoverflow.com/a/45204031/14470738
@@ -30,6 +35,7 @@ glm::mat4 convertMatrix4(const aiMatrix4x4 &mat4) {
 }
 
 cg::Object3D *cg::loadObj(const char *path) {
+    // TODO finish .obj file reader
     Assimp::Importer importer;
 
     const aiScene *scene = importer.ReadFile(path,
@@ -101,8 +107,15 @@ cg::Object3D *cg::loadObj(const char *path) {
         if (it_mat != mats.end()) {
             mat = it_mat->second;
         } else {
-            mat = std::make_shared<PhongMaterial>();
+            auto phong = std::make_shared<PhongMaterial>();
             aiMaterial *ai_mat = scene->mMaterials[mesh->mMaterialIndex];
+            // diffuse texture
+            aiString diffuse;
+            ai_mat->Get(AI_MATKEY_TEXTURE_DIFFUSE(0), diffuse);
+            if (diffuse.length) {
+                phong->diffuse = Application::loadTexture(diffuse.C_Str());
+            }
+            mat = std::move(phong);
         }
 
         // mesh
@@ -127,4 +140,70 @@ cg::Object3D *cg::loadObj(const char *path) {
     };
     convert_scene(scene->mRootNode, root);
     return root;
+}
+
+Object3D *toPlaceHolder(nlohmann::json &);
+
+Mesh *toBox(nlohmann::json &obj);
+
+Object3D *toObject(nlohmann::json &obj) {
+    if (obj["type"] == "placeholder") {
+        return toPlaceHolder(obj);
+    } else if (obj["type"] == "box") {
+        return toBox(obj);
+    }
+    return nullptr;
+};
+
+Mesh *toBox(nlohmann::json &obj) {
+    auto &position = obj["position"];
+    auto &size = obj["size"];
+    auto &rotation = obj["rotation"];
+    auto &color = obj["color"];
+
+    auto *material = new PhongMaterial();
+    auto *geometry = new BoxGeometry(size[0], size[1], size[2]);
+
+    Mesh *mesh = new Mesh(std::shared_ptr<Material>(material), std::shared_ptr<Geometry>(geometry));
+    material->color = glm::vec4{color[0], color[1], color[2], 1.0f};
+    if (obj.contains("shininess")) {
+        material->shininess = obj["shininess"];
+    }
+    mesh->setPosition(glm::vec3{position[0], position[1], position[2]});
+    mesh->applyRotation(glm::quat{rotation[0], rotation[1], rotation[2], rotation[3]});
+    return mesh;
+};
+
+Object3D *toPlaceHolder(nlohmann::json &obj) {
+    auto &position = obj["position"];
+    auto &rotation = obj["rotation"];
+
+    Object3D *ob = new Object3D;
+    ob->setPosition(glm::vec3{position[0], position[1], position[2]});
+    ob->applyRotation(glm::quat{rotation[0], rotation[1], rotation[2], rotation[3]});
+    if (obj.contains("children")) {
+        for (auto &child : obj["children"]) {
+            ob->addChild(toObject(child));
+        }
+    }
+    return ob;
+};
+
+cg::Object3D *cg::loadJsonScene(const char *path) {
+    auto *root = new Object3D;
+    try {
+        using namespace nlohmann;
+        std::ifstream i(std::filesystem::u8path(path));
+        json j;
+
+        i >> j;
+        for (auto &obj : j["objects"]) {
+            auto *o = toObject(obj);
+            if (o) root->addChild(o);
+        }
+        return root;
+    } catch (std::exception &ex) {
+        delete root;
+        return nullptr;
+    }
 }

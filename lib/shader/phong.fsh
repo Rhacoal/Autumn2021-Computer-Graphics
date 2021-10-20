@@ -58,7 +58,6 @@ void main() {
     result += (spec * directionalLight.color.rgb * directionalLight.color.a);
 #endif
     result.rgb += ambientLight.rgb * ambientLight.a;
-    result *= color.rgb;
 
-    fragColor = vec4(result, 1.0);
+    fragColor = vec4(result, opacity) * color;
 }

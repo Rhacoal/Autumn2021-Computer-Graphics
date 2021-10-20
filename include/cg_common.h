@@ -65,10 +65,10 @@ inline void printMatrix(const glm::mat4& mat) {
 
 template<typename T>
 inline void printVec(T t) {
-    if constexpr (t.length() >= 3) {
+    if (t.length() >= 3) {
         printf("%f %f %f", t[0], t[1], t[2]);
     }
-    if constexpr (t.length() >= 4) {
+    if (t.length() >= 4) {
         printf(" %f", t[3]);
     }
     puts("");

@@ -1,5 +1,5 @@
 if (MSVC AND NOT "${MSVC_VERSION}" LESS 1400)
-    add_definitions("/MP")
+    add_compile_options(/MP)
 endif ()
 
 
@@ -20,7 +20,7 @@ include_directories(
         ${OPENGL_INCLUDE_DIRS}
 )
 
-add_subdirectory(glfw-3.1.2)
+add_subdirectory(glfw-3.3.4)
 
 ### GLAD ###
 add_library(glad glad/include/glad/glad.h glad/src/glad.c)
@@ -33,7 +33,7 @@ file(GLOB IMGUI_INCLUDE imgui-1.85/include/*.h)
 add_library(imgui
         ${IMGUI_SRC}
         ${IMGUI_INCLUDE})
-target_include_directories(imgui PUBLIC imgui-1.85/include glfw-3.1.2/include)
+target_include_directories(imgui PUBLIC imgui-1.85/include glfw-3.3.4/include)
 
 
 ### ASSIMP ###
@@ -46,6 +46,10 @@ include(CheckFunctionExists)
 
 # Compile without Boost
 add_definitions(-DASSIMP_BUILD_BOOST_WORKAROUND)
+
+# tinydialog
+add_library(tinydialog tinydialog-3.8.8/tinyfiledialogs.cpp tinydialog-3.8.8/tinyfiledialogs.h)
+target_include_directories(tinydialog PUBLIC tinydialog-3.8.8)
 
 # Compile AssImp
 #set(LIB_INSTALL_DIR "lib")

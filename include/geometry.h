@@ -91,6 +91,22 @@ public:
         return count;
     }
 
+    template<typename F>
+    void traverseVertices(F &&func) {
+        auto it = attribs.find("position");
+        if (it == attribs.end()) return;
+        const auto &pos = it->second.buf;
+        if (indices.has_value()) {
+            for (unsigned int pi : *indices) {
+                func(pos[pi * 3], pos[pi * 3 + 1], pos[pi * 3 + 2]);
+            }
+        } else {
+            for (unsigned int i = 0; i + 2 < pos.size(); i += 3) {
+                func(pos[i], pos[i + 1], pos[i + 2]);
+            }
+        }
+    }
+
 private:
     void _invalidate_vbo() {
         _need_update = true;

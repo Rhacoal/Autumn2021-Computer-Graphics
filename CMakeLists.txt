@@ -43,6 +43,7 @@ include_directories(
         external/glm-0.9.7.1/
         external/glad/include/
         external/headeronly/
+        external/tinydialog-3.8.8/
         include/
         .
 )
@@ -53,6 +54,7 @@ set(ALL_LIBS
         glfw
         imgui
         assimp
+        tinydialog
         ${FRAMEWORKS}
         )
 
