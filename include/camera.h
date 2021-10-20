@@ -16,8 +16,12 @@ public:
         return _project;
     }
 
+    cg::Camera *isCamera() override {
+        return this;
+    }
+
     virtual glm::mat4 viewMatrix() const {
-        return glm::inverse(modelToWorldMatrix());
+        return worldMatrix();
     }
 };
 
@@ -35,12 +39,12 @@ protected:
         float c = -(far + near) / (far - near);
         float d = -2 * far * near / (far - near);
 
-        mat = glm::mat4(
+        mat = glm::transpose(glm::mat4(
             x, 0.0, a, 0.0,
             0.0, y, b, 0.0,
             0.0, 0.0, c, d,
             0.0, 0.0, -1.0, 0.0
-        );
+        ));
     }
 
 public:
@@ -70,8 +74,8 @@ public:
 
         float right = left + width;
         float bottom = top - height;
-        _project = glm::perspective(glm::radians(_fov), _aspect_ratio, _near, _far);
-//        makePerspective(_project, left, right, top, bottom, _near, _far);
+//        _project = glm::perspective(glm::radians(_fov), _aspect_ratio, _near, _far);
+        makePerspective(_project, left, right, top, bottom, _near, _far);
     }
 };
 

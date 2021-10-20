@@ -8,7 +8,7 @@
 
 namespace cg {
 
-Mesh *read(const std::filesystem::path &path);
+Object3D *loadObj(const char* path);
 
 }
 

@@ -1,71 +1,63 @@
 #include <obj_loader.h>
+#include <cg_common.h>
+#include <object3d.h>
+#include <mesh.h>
 
-#include <fstream>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 #include <vector>
 #include <regex>
 #include <optional>
+#include <functional>
 
 static std::vector<std::string> split(const std::string &str, const std::regex &delim) {
     // https://stackoverflow.com/a/45204031/14470738
     return std::vector<std::string>{std::sregex_token_iterator{str.begin(), str.end(), delim, -1}, {}};
 }
 
-cg::Mesh *cg::read(const std::filesystem::path &path) {
-    using vertex = std::tuple<float, float, float>;
-    using texCoord = std::tuple<float, float, float>;
-    using normal = std::tuple<float, float, float>;
-    using face_vert = std::tuple<int, std::optional<int>, std::optional<int>>;
-    using face = std::tuple<face_vert, face_vert, face_vert, std::optional<face_vert>>;
-    struct group {
-        std::string material;
-        std::vector<face> faces;
+glm::mat4 convertMatrix4(const aiMatrix4x4 &mat4) {
+    return glm::mat4{
+        {mat4.a1, mat4.a2, mat4.a3, mat4.a4},
+        {mat4.b1, mat4.b2, mat4.b3, mat4.b4},
+        {mat4.c1, mat4.c2, mat4.c3, mat4.c4},
+        {mat4.d1, mat4.d2, mat4.d3, mat4.d4},
     };
-    std::ifstream fin(path, std::ios_base::in | std::ios_base::binary);
-    std::vector<vertex> vertices(1);
-    std::vector<texCoord> texCoords(1);
-    std::vector<normal> normals(1);
-    std::vector<group> groups;
+}
 
-    std::string line;
-    std::regex blank(R"(\s+)");
-    while (std::getline(fin, line)) {
-        auto cmd = split(line, blank);
-        if (cmd[0] == "v") {
-            if (cmd.size() != 4) {
-                fprintf(stderr, "unexpected sequence: %s\n", line.c_str());
-                return nullptr;
-            }
-            float x = strtof(cmd[1].c_str(), nullptr);
-            float y = strtof(cmd[2].c_str(), nullptr);
-            float z = strtof(cmd[3].c_str(), nullptr);
-            vertices.emplace_back(x, y, z);
-        } else if (cmd[0] == "vt") {
-            if (cmd.size() != 2 && cmd.size() != 3) {
-                fprintf(stderr, "unexpected sequence: %s\n", line.c_str());
-                return nullptr;
-            }
-            float u = strtof(cmd[1].c_str(), nullptr);
-            float v = strtof(cmd[2].c_str(), nullptr);
-            float w = cmd.size() == 3.0 ? strtof(cmd[3].c_str(), nullptr) : 0.0;
-            texCoords.emplace_back(u, v, w);
-        } else if (cmd[0] == "vn") {
-            if (cmd.size() != 4) {
-                fprintf(stderr, "unexpected sequence: %s\n", line.c_str());
-                return nullptr;
-            }
-            float x = strtof(cmd[1].c_str(), nullptr);
-            float y = strtof(cmd[2].c_str(), nullptr);
-            float z = strtof(cmd[3].c_str(), nullptr);
-            normals.emplace_back(x, y, z);
-        } else if (cmd[0] == "f") {
-            if (!groups.size()) {
-                fprintf(stderr, "unexpected f before g\n");
-            }
-            if (cmd.size() != 4 && cmd.size() != 5) {
-                fprintf(stderr, "only supports triangles and rectangles: %s\n", line.c_str());
+cg::Object3D *cg::loadObj(const char *path) {
+    Assimp::Importer importer;
+
+    const aiScene *scene = importer.ReadFile(path,
+                                             aiProcess_CalcTangentSpace |
+                                             aiProcess_Triangulate |
+                                             aiProcess_JoinIdenticalVertices |
+                                             aiProcess_SortByPType);
+    if (!scene) {
+        fprintf(stderr, "failed to load obj: %s\n%s\n", path, importer.GetErrorString());
+        return nullptr;
+    }
+
+    Object3D *root = new Object3D;
+    const auto convert_mesh = [&](unsigned int meshIdx) -> Mesh * {
+        return nullptr;
+    };
+    const std::function<void(aiNode *, Object3D *)> dfs = [&](aiNode *node, Object3D *parent) {
+        Object3D *nodeObj = new Object3D;
+        nodeObj->setLocalMatrix(convertMatrix4(node->mTransformation));
+        if (node->mNumMeshes) {
+            for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
+                Mesh *mesh = convert_mesh(node->mMeshes[i]);
+                if (mesh) {
+                    parent->addChild(mesh);
+                }
             }
         }
-    }
-    // TODO
-    return nullptr;
+
+        // continue for all child nodes
+        for (unsigned int i = 0; i < node->mNumChildren; ++i) {
+            dfs(node->mChildren[i], parent);
+        }
+    };
 }

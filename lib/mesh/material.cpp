@@ -52,7 +52,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
             pointLights[point_light_cnt++] = PointLightStruct{
                 .position = pointLight->localToWorld(pointLight->position()),
                 .direction = glm::vec3(
-                    pointLight->parentModelToWorldMatrix() * glm::vec4(pointLight->lookDir(), 0.0)),
+                    pointLight->parentModelMatrix() * glm::vec4(pointLight->lookDir(), 0.0)),
                 .color = glm::vec4(pointLight->color(), pointLight->intensity()),
             };
         } else if (light->isDirectionalLight()) {
@@ -64,7 +64,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
                     printf("%.2f, %.2f, %.2f\n", t.x, t.y, t.z);
                 }
                 dirLights[0] = DirectionalLightStruct{
-                    .direction = glm::vec3(dirLight->parentModelToWorldMatrix() * glm::vec4(dirLight->lookDir(), 0.0)),
+                    .direction = glm::vec3(dirLight->parentModelMatrix() * glm::vec4(dirLight->lookDir(), 0.0)),
                     .color = glm::vec4(dirLight->color(), dirLight->intensity()),
                 };
             }
@@ -139,11 +139,37 @@ glm::vec4 homo(glm::vec4 in) {
 void cg::PhongMaterial::updateUniforms(cg::Object3D *object, Camera &camera) {
     GLuint sp = shader.id;
     if (!sp) return;
-    auto worldMatrix = object->modelToWorldMatrix();
-    glUniformMatrix4fv(glGetUniformLocation(sp, "modelMatrix"), 1, GL_FALSE, &worldMatrix[0][0]);
-    auto vMatrix = glm::inverse(camera.modelToWorldMatrix());
+    auto modelMatrix = object->modelMatrix();
+    glUniformMatrix4fv(glGetUniformLocation(sp, "modelMatrix"), 1, GL_FALSE, &modelMatrix[0][0]);
+    auto vMatrix = camera.viewMatrix();
     auto pMatrix = camera.projectionMatrix();
-    auto mvpMatrix = pMatrix * vMatrix * worldMatrix;
+    auto mvpMatrix = pMatrix * vMatrix * modelMatrix;
+
+
+    auto zero = mvpMatrix * glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    auto x = homo(vMatrix * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    auto y = homo(vMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    auto z = homo(vMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+
+    float halfX = 1.0f, halfY = 1.0f, halfZ = 1.0f;
+    float positions[] = {
+        -halfX, -halfY, -halfZ,
+        halfX, -halfY, -halfZ,
+        halfX, halfY, -halfZ,
+        -halfX, halfY, -halfZ,
+        -halfX, -halfY, halfZ,
+        halfX, -halfY, halfZ,
+        halfX, halfY, halfZ,
+        -halfX, halfY, halfZ,
+    };
+    glm::vec4 tet[8];
+    for (int i = 0; i < 8; ++i) {
+        tet[i] = homo(vMatrix * glm::vec4(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 1.0f));
+        printf("(%.2f, %.2f, %.2f) -> (%.2f, %.2f, %.2f)\n",
+               positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+               tet[i].x, tet[i].y, tet[i].z);
+    }
+
     glUniformMatrix4fv(glGetUniformLocation(sp, "mvpMatrix"), 1, GL_FALSE, &mvpMatrix[0][0]);
 }
 

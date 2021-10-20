@@ -39,7 +39,6 @@ endif (INCLUDE_DISTRIB)
 
 
 include_directories(
-        external/AntTweakBar-1.16/include/
         external/glfw-3.1.2/include/
         external/glm-0.9.7.1/
         external/glad/include/
@@ -53,6 +52,7 @@ set(ALL_LIBS
         glad
         glfw
         imgui
+        assimp
         ${FRAMEWORKS}
         )
 
