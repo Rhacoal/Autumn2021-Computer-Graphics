@@ -82,6 +82,9 @@ cg::CubeTexture cg::CubeTexture::load(const char **faces) {
     return CubeTexture(textureID);
 }
 
+cg::Texture::Texture(cg::DefaultTexture type) : impl(defaultTexture(type).impl) {
+}
+
 cg::Texture cg::Texture::defaultTexture(cg::DefaultTexture type) {
     static std::map<cg::DefaultTexture, cg::Texture> defaultTexMap;
     auto it = defaultTexMap.find(type);
@@ -116,7 +119,9 @@ cg::Texture cg::Texture::defaultTexture(cg::DefaultTexture type) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // load and generate the texture
+    // no gamma correction needed
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGBA, GL_FLOAT, data);
+    // mipmap is not needed
 //    glGenerateMipmap(GL_TEXTURE_2D);
 
     return defaultTexMap.emplace(type, tex).first->second;

@@ -113,7 +113,7 @@ cg::Object3D *cg::loadObj(const char *path) {
             aiString diffuse;
             ai_mat->Get(AI_MATKEY_TEXTURE_DIFFUSE(0), diffuse);
             if (diffuse.length) {
-                phong->diffuse = Application::loadTexture(diffuse.C_Str());
+                phong->diffuse = Application::loadTexture(diffuse.C_Str(), Texture::LINEAR);
             }
             mat = std::move(phong);
         }
@@ -144,7 +144,9 @@ cg::Object3D *cg::loadObj(const char *path) {
 
 Object3D *toPlaceHolder(nlohmann::json &);
 
-Mesh *toBox(nlohmann::json &obj);
+Mesh *toBox(nlohmann::json &);
+
+Material *toMaterial(nlohmann::json &);
 
 Object3D *toObject(nlohmann::json &obj) {
     if (obj["type"] == "placeholder") {
@@ -174,6 +176,58 @@ Mesh *toBox(nlohmann::json &obj) {
     return mesh;
 };
 
+Material *toMaterial(nlohmann::json &obj) {
+    auto &type = obj["material"];
+    const auto loadTexture = [](nlohmann::json &tex, Texture::Encoding defaultEncoding) {
+        std::string path = tex["path"];
+        float intensity = 1.0f;
+        {
+            auto it = tex.find("encoding");
+            if (it != tex.end()) {
+                if (*it == "linear") {
+                    defaultEncoding = Texture::Encoding::LINEAR;
+                } else if (*it == "srgb") {
+                    defaultEncoding = Texture::Encoding::SRGB;
+                }
+            }
+        }
+        {
+            auto it = tex.find("intensity");
+            if (it != tex.end()) {
+                intensity = *it;
+            }
+        }
+        return std::make_pair(Application::loadTexture(path.c_str(), defaultEncoding), intensity);
+    };
+    const auto getTexture = [&](const char *key,
+                                Texture::DefaultTexture defaultTexture,
+                                Texture::Encoding defaultEncoding = Texture::Encoding::LINEAR) {
+        auto it = obj.find(key);
+        if (it == obj.end()) {
+            return std::make_pair(Texture::defaultTexture(defaultTexture), 1.0f);
+        }
+        return loadTexture(*it, defaultEncoding);
+    };
+    if (type == "standard") {
+        auto stdMat = new StandardMaterial;
+        obj.find("albedo");
+        auto albedo = getTexture("albedo", Texture::DefaultTexture::WHITE);
+        stdMat->albedoMap = albedo.first;
+        stdMat->albedoIntensity = albedo.second;
+        auto metallic = getTexture("metallic", Texture::DefaultTexture::WHITE);
+        stdMat->metallicMap = metallic.first;
+        stdMat->metallicIntensity = metallic.second;
+        auto roughness = getTexture("roughness", Texture::DefaultTexture::WHITE);
+        stdMat->roughnessMap = roughness.first;
+        stdMat->roughnessIntensity = roughness.second;
+        auto ao = getTexture("ao", Texture::DefaultTexture::WHITE);
+        stdMat->aoMap = ao.first;
+        stdMat->aoIntensity = ao.second;
+        auto normal = getTexture("normal", Texture::DefaultTexture::DEFAULT_NORMAL);
+        stdMat->normalMap = normal;
+    }
+}
+
 Object3D *toPlaceHolder(nlohmann::json &obj) {
     auto &position = obj["position"];
     auto &rotation = obj["rotation"];
@@ -192,9 +246,8 @@ Object3D *toPlaceHolder(nlohmann::json &obj) {
 cg::Object3D *cg::loadJsonScene(const char *path) {
     auto *root = new Object3D;
     try {
-        using namespace nlohmann;
         std::ifstream i(std::filesystem::u8path(path));
-        json j;
+        nlohmann::json j;
 
         i >> j;
         for (auto &obj : j["objects"]) {

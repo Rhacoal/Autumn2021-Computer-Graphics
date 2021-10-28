@@ -1,9 +1,10 @@
 #ifndef ASSIGNMENT_APPLICATION_H
 #define ASSIGNMENT_APPLICATION_H
 
+#include <cg_fwd.h>
 #include <cg_common.h>
 #include <scene.h>
-#include <cg_fwd.h>
+#include <texture.h>
 
 #include <memory>
 #include <string>
@@ -57,7 +58,7 @@ public:
 
     bool running() const { return _running; }
 
-    static Texture loadTexture(const char *path);
+    static Texture loadTexture(const char *path, Texture::Encoding encoding);
 };
 }
 

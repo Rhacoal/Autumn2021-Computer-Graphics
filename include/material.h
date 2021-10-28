@@ -60,11 +60,6 @@ public:
     }
 };
 
-template<typename M>
-class InstancedMaterial : public M {
-    // TODO
-};
-
 class PhongMaterial : public Material {
     typedef std::tuple<int, int> cache_key_t;
     cache_key_t prevKey;
@@ -82,6 +77,29 @@ public:
     void updateUniforms(Object3D *object, Camera &camera) override;
 };
 
+class StandardMaterial : public Material {
+    typedef std::tuple<int, int> cache_key_t;
+    cache_key_t prevKey;
+public:
+    Shader shader;
+    std::optional<Texture> albedoMap;
+    float albedoIntensity = 1.0f;
+    std::optional<Texture> metallicMap;
+    float metallicIntensity = 1.0f;
+    std::optional<Texture> roughnessMap;
+    float roughnessIntensity = 1.0f;
+    std::optional<Texture> aoMap;
+    float aoIntensity = 1.0f;
+    std::optional<Texture> normalMap;
+    std::optional<CubeTexture> envMap;
+
+    StandardMaterial() = default;
+
+    GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) override;
+
+    void updateUniforms(Object3D *object, Camera &camera) override;
+};
+
 class SkyboxMaterial : public Material {
 public:
     Shader shader;
@@ -92,12 +110,6 @@ public:
     GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) noexcept override;
 
     void updateUniforms(Object3D *object, Camera &camera) override;
-};
-
-struct StandardMaterial : public Material {
-    std::optional<Texture> albedo;
-    std::optional<Texture> mra;
-    std::optional<Texture> normal;
 };
 }
 

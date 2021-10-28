@@ -10,14 +10,18 @@
 namespace cg {
 struct TextureImpl;
 
-enum class DefaultTexture {
-    WHITE, BLACK, DEFAULT_NORMAL, TRANSPARENT,
-};
-
 class Texture {
 private:
     std::shared_ptr<TextureImpl> impl;
 public:
+    enum class Encoding {
+        LINEAR = GL_RGB, SRGB = GL_SRGB,
+    };
+
+    enum class DefaultTexture {
+        WHITE, BLACK, DEFAULT_NORMAL, TRANSPARENT,
+    };
+
     explicit Texture(GLuint tex);
 
     Texture();

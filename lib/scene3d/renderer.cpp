@@ -10,7 +10,8 @@
 #include <algorithm>
 
 void cg::Renderer::render(Scene &sc, Camera &cam) {
-    ProgramArguments pargs;
+    static ProgramArguments pargs;
+    pargs.clear();
     draw_calls.clear();
 
     // collect lighting
@@ -19,6 +20,31 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
             pargs.lights.push_back(obj.isLight());
         }
     });
+    for (Light *light : pargs.lights) {
+        if (light->isPointLight()) {
+            auto pointLight = light->isPointLight();
+            if (pargs.pointLightCount == ProgramArguments::MAX_POINT_LIGHT_COUNT) {
+                continue;
+            }
+            pargs.pointLights[pargs.pointLightCount++] = {
+                .position = pointLight->localToWorld(pointLight->position()),
+                .direction = glm::vec3(
+                    pointLight->parentModelMatrix() * glm::vec4(pointLight->lookDir(), 0.0)),
+                .color = (pointLight->color() * pointLight->intensity()),
+            };
+        } else if (light->isDirectionalLight()) {
+            auto dirLight = light->isDirectionalLight();
+            if (pargs.directionalLightCount == ProgramArguments::MAX_DIR_LIGHT_COUNT) {
+                continue;
+            }
+            pargs.directionalLights[pargs.directionalLightCount++] = {
+                .direction = glm::vec3(dirLight->parentModelMatrix() * glm::vec4(dirLight->lookDir(), 0.0)),
+                .color = dirLight->color() * dirLight->intensity(),
+            };
+        } else if (light->isAmbientLight()) {
+            pargs.ambientColor += light->color() * light->intensity();
+        }
+    }
 
     sc.traverse([&](Object3D &obj) {
         obj.render(*this, sc, cam);
@@ -58,4 +84,8 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
         }
     }
     glUseProgram(0);
+}
+
+void cg::RayTracingRenderer::render(cg::Scene &sc, cg::Camera &cam, int spp, int outputWidth, int outputHeight) {
+    // TODO
 }

@@ -1,0 +1,12 @@
+{
+    "material": "standard",
+    "albedo": {
+        "texture": "rustediron2/rustediron2_basecolor.png"
+    },
+    "metallic": {
+        "texture": "rustediron2/rustediron2_metallic.png"
+    },
+    "roughness": {
+        "texture": "rustediron2/rustediron2_roughness.png"
+    }
+}

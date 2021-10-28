@@ -12,6 +12,32 @@
 namespace cg {
 struct ProgramArguments {
     std::vector<Light *> lights;
+    static constexpr int MAX_POINT_LIGHT_COUNT = 100;
+    static constexpr int MAX_DIR_LIGHT_COUNT = 100;
+
+    // a maximum of 100 point lights are tracked
+    int pointLightCount;
+    struct PointLightStruct {
+        glm::vec3 position;
+        glm::vec3 direction;
+        glm::vec3 color;
+    } pointLights[MAX_POINT_LIGHT_COUNT] = {};
+
+    // a maximum of 100 directional lights is tracked
+    int directionalLightCount;
+    struct DirectionalLightStruct {
+        glm::vec3 direction;
+        glm::vec3 color;
+    } directionalLights[MAX_DIR_LIGHT_COUNT] = {};
+
+    glm::vec3 ambientColor{};
+
+    void clear() {
+        lights.clear();
+        pointLightCount = 0;
+        directionalLightCount = 0;
+        ambientColor = glm::vec3{0.0f};
+    }
 };
 
 class Renderer {
@@ -19,9 +45,14 @@ class Renderer {
 public:
     void render(Scene &sc, Camera &cam);
 
-    void draw(Material *mat, Geometry *geo, Object3D* obj) {
+    void draw(Material *mat, Geometry *geo, Object3D *obj) {
         draw_calls.emplace_back(mat, geo, obj);
     }
+};
+
+class RayTracingRenderer {
+public:
+    void render(Scene &sc, Camera &cam, int outputWidth, int outputHeight, int spp = 1);
 };
 }
 

@@ -66,7 +66,7 @@ add_definitions(
         -DGL_SILENCE_DEPRECATION
 )
 
-add_executable(assignment lib/scene3d/object3d.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/shader/shader.cpp src/appmain.cpp lib/util/texture.cpp lib/importer/obj_loader.cpp)
+add_executable(assignment lib/scene3d/object3d.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/util/shader.cpp src/appmain.cpp lib/util/texture.cpp lib/importer/obj_loader.cpp)
 target_link_libraries(assignment
         ${ALL_LIBS}
         )
@@ -74,10 +74,10 @@ target_link_libraries(assignment
 set_target_properties(assignment PROPERTIES XCODE_ATTRIBUTE_CONFIGURATION_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
 create_target_launcher(assignment WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
 
-configure_file(lib/shader/phong.fsh lib/shader/phong.fsh COPYONLY)
-configure_file(lib/shader/phong.vsh lib/shader/phong.vsh COPYONLY)
-
 add_custom_target(copy_assets
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
         )
-add_dependencies(assignment copy_assets)
+add_custom_target(copy_shaders
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/lib/shaders ${CMAKE_CURRENT_BINARY_DIR}/lib/shaders
+        )
+add_dependencies(assignment copy_assets copy_shaders)

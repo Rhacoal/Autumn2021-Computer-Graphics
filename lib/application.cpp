@@ -46,7 +46,7 @@ struct MA {
 
 std::map<std::string, cg::Texture> cg::Application::_managed_textures;
 
-cg::Texture cg::Application::loadTexture(const char *path) {
+cg::Texture cg::Application::loadTexture(const char *path, Texture::Encoding encoding) {
     // if loaded, simply returns it
     auto it = _managed_textures.find(path);
     std::string key = path;
@@ -68,7 +68,7 @@ cg::Texture cg::Application::loadTexture(const char *path) {
     int width, height, nrChannels;
     unsigned char *data = stbi_load(path, &width, &height, &nrChannels, STBI_rgb_alpha);
     if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, encoding, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
         stbi_image_free(data);
@@ -124,6 +124,7 @@ void cg::Application::start(const ApplicationConfig &config) {
         return;
     }
 
+    puts(reinterpret_cast<const char*>(glGetString(GL_VERSION)));
     printf("glGenVertexArrays: %p\n", glGenVertexArrays);
     printf("glShaderSource: %p\n", glShaderSource);
 

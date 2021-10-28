@@ -213,8 +213,9 @@ public:
 
             ImGui::Begin("Assignment 2");
             if (ImGui::Button("load scene...")) {
-                static constexpr const char *filter[] = {"*.json"};
-                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
+//                static constexpr const char *filter[] = {"*.json"};
+//                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
+                const char *path = "assets/scene/scene.json";
                 if (path) {
                     auto obj = loadJsonScene(path);
                     if (!obj) {

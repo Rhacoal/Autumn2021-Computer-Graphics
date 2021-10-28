@@ -1,0 +1,7 @@
+{
+    "material": "phong",
+    "albedo": {
+        "texture": "rustediron2/rustediron2_basecolor.png"
+    },
+    "shininess": 25.0
+}
