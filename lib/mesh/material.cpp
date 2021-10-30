@@ -3,24 +3,14 @@
 #include <renderer.h>
 #include <lighting.h>
 #include <camera.h>
+#include <texture.h>
 
 #include <string>
 #include <sstream>
 #include <utility>
 #include <tuple>
-#include <texture.h>
-
-static std::string readFile(const char *path) {
-    std::stringstream ret;
-    char buf[1024];
-    FILE *f = fopen(path, "rb");
-    size_t n;
-    while ((n = fread(buf, 1, 1024, f))) {
-        ret.write(buf, static_cast<std::streamsize>(n));
-    }
-    fclose(f);
-    return ret.str();
-}
+#include <filesystem>
+#include <fstream>
 
 int cg::Material::latest_id = 1;
 
@@ -100,7 +90,7 @@ void cg::PhongMaterial::updateUniforms(cg::Object3D *object, Camera &camera) {
 }
 
 GLuint cg::StandardMaterial::useShaderProgram(cg::Scene &scene, cg::Camera &camera, cg::ProgramArguments &pargs) {
-
+    return 0;
 }
 
 void cg::StandardMaterial::updateUniforms(cg::Object3D *object, cg::Camera &camera) {

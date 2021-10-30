@@ -85,7 +85,3 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
     }
     glUseProgram(0);
 }
-
-void cg::RayTracingRenderer::render(cg::Scene &sc, cg::Camera &cam, int spp, int outputWidth, int outputHeight) {
-    // TODO
-}

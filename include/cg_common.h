@@ -16,6 +16,8 @@ typedef SSIZE_T ssize_t;
 #include <cstdint>
 #include <stdexcept>
 #include <cstdio>
+#include <fstream>
+#include <filesystem>
 
 namespace cg {
 inline int initGL() {
@@ -73,6 +75,12 @@ inline void printVec(T t) {
     }
     puts("");
 }
+}
+
+inline std::string readFile(const char *path) {
+    auto fspath = std::filesystem::u8path(path);
+    std::ifstream in(fspath, std::ios::in | std::ios::binary);
+    return std::string{std::istreambuf_iterator<char>(in), {}};
 }
 }
 #endif //ASSIGNMENT_CG_COMMON_H

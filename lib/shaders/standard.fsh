@@ -27,12 +27,16 @@ uniform vec3 ambientLight;
 uniform mat4 modelMatrix, mvpMatrix;
 uniform vec3 cameraPosition;
 
-uniform sampler2D diffuse;
-uniform float shininess;
+uniform sampler2D albedo;
+uniform sampler2D metallic;
+uniform float metallicIntensity;
+uniform sampler2D roughness;
+uniform float roughnessIntensity;
+uniform sampler2D ao;
+uniform float aoIntensity;
+uniform sampler2D normal;
 uniform vec4 color;
 
-
-in vec4 vColor;
 in vec2 vUv;
 in vec3 worldPosition;
 in vec3 vNormal;

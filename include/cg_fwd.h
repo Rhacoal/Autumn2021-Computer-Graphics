@@ -49,6 +49,10 @@ class DirectionalLight;
 class PointLight;
 
 class AmbientLight;
+
+class RayTracingScene;
+
+class RayTracingRenderer;
 }
 
 #endif //ASSIGNMENT_CG_FWD_H

@@ -75,14 +75,23 @@ public:
 
 class ShaderPassLink {
     int _width, _height;
-    std::vector<ShaderPass*> passes;
+    std::vector<ShaderPass *> _passes;
 public:
     ShaderPassLink(int width, int height);
 
     template<typename Iter>
     void usePasses(Iter first, Iter last) {
-        passes.clear();
-        passes.insert(passes.end(), first, last);
+        _passes.clear();
+        _passes.insert(_passes.end(), first, last);
+    }
+
+    void usePasses(const std::initializer_list<std::pair<bool, ShaderPass *>> &passes) {
+        _passes.clear();
+        for (const auto &[enabled, sp] : passes) {
+            if (enabled) {
+                _passes.emplace_back(sp);
+            }
+        }
     }
 
     void renderBegin();

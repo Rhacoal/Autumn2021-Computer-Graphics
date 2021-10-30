@@ -49,11 +49,6 @@ public:
         draw_calls.emplace_back(mat, geo, obj);
     }
 };
-
-class RayTracingRenderer {
-public:
-    void render(Scene &sc, Camera &cam, int outputWidth, int outputHeight, int spp = 1);
-};
 }
 
 #endif //ASSIGNMENT_RENDERER_H

@@ -65,7 +65,7 @@ class PhongMaterial : public Material {
     cache_key_t prevKey;
 public:
     Shader shader;
-    std::optional<Texture> diffuse = Texture::defaultTexture(DefaultTexture::WHITE);
+    std::optional<Texture> diffuse = Texture::defaultTexture(Texture::DefaultTexture::WHITE);
     glm::float32 shininess;
 
     PhongMaterial() : shininess(1.0f) {}

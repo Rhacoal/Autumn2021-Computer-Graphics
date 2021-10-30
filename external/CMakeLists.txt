@@ -23,7 +23,7 @@ include_directories(
 add_subdirectory(glfw-3.3.4)
 
 ### GLAD ###
-add_library(glad glad/include/glad/glad.h glad/src/glad.c)
+add_library(glad glad/include/glad/glad.h glad/src/glad.c headeronly/cl.hpp)
 target_include_directories(glad PUBLIC glad/include/)
 
 

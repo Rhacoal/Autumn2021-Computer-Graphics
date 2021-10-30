@@ -23,7 +23,7 @@ struct TextureImpl {
         rhs.tex = 0;
     }
 
-    void generate(int width, int height, GLenum format) {
+    void generate(int width, int height, GLuint format) {
         if (tex) {
             glDeleteTextures(1, &tex);
             tex = 0u;
@@ -31,10 +31,29 @@ struct TextureImpl {
         GLuint texture;
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         tex = texture;
+    }
+
+    void setData(int width, int height, GLint internalFormat, GLenum format, GLenum type, const void *data) {
+        GLuint texture = tex;
+        if (!texture) {
+            glGenTextures(1, &texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        }
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        tex = texture;
+    }
+
+    void fill(int width, int height, float *data) {
+        if (!tex) {
+        }
+
     }
 
     ~TextureImpl() {
@@ -65,7 +84,7 @@ cg::CubeTexture cg::CubeTexture::load(const char **faces) {
         if (data) {
             // by default, assumes that skybox is in srgb
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-                         0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+                0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
             );
             stbi_image_free(data);
         } else {
@@ -82,11 +101,8 @@ cg::CubeTexture cg::CubeTexture::load(const char **faces) {
     return CubeTexture(textureID);
 }
 
-cg::Texture::Texture(cg::DefaultTexture type) : impl(defaultTexture(type).impl) {
-}
-
-cg::Texture cg::Texture::defaultTexture(cg::DefaultTexture type) {
-    static std::map<cg::DefaultTexture, cg::Texture> defaultTexMap;
+cg::Texture cg::Texture::defaultTexture(cg::Texture::DefaultTexture type) {
+    static std::map<cg::Texture::DefaultTexture, cg::Texture> defaultTexMap;
     auto it = defaultTexMap.find(type);
     if (it != defaultTexMap.end()) {
         return it->second;
@@ -135,6 +151,10 @@ GLuint cg::Texture::tex() const {
     return impl ? impl->tex : 0;
 }
 
-void cg::Texture::generate(int width, int height, GLenum format) {
-    impl->generate(width, height, format);
+void cg::Texture::generate(int width, int height, GLint internalFormat) {
+    impl->generate(width, height, internalFormat);
+}
+
+void cg::Texture::setData(int width, int height, GLint internalFormat, GLenum format, GLenum type, const void *data) {
+    impl->setData(width, height, internalFormat, format, type, data);
 }

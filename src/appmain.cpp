@@ -6,6 +6,7 @@
 #include <mesh.h>
 #include <lighting.h>
 #include <obj_loader.h>
+#include <rt.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -48,37 +49,14 @@ void main() {
 }
 )";
 
-Geometry *generateRandomGround(int segs, float xSize, float zSize, float yScale) {
-    siv::BasicPerlinNoise<float> perlin;
-    auto *points = new float[(segs + 1) * (segs + 1) * 3];
-    for (int i = 0; i <= segs; ++i) {
-        float x = float(i) * 1.0f / xSize;
-        for (int j = 0; j <= segs; ++j) {
-            float z = float(j) * 1.0f / zSize;
-            int index = i * (segs + 1) + j;
-            float y = perlin.accumulatedOctaveNoise2D(x, z, 8) * yScale;
-            points[index * 3 + 0] = x - xSize / 2;
-            points[index * 3 + 1] = y;
-            points[index * 3 + 2] = z - zSize / 2;
-        }
-    }
-    auto *indices = new unsigned int[segs * segs * 3];
-    for (int i = 0; i < segs; ++i) {
-        for (int j = 0; j < segs; ++j) {
-            // TODO generate terrain
-        }
-    }
-    delete[] points;
-    delete[] indices;
-    return nullptr;
-}
-
 class AppMain : public cg::Application {
     inline static AppMain *appMain = nullptr;
     Renderer renderer;
     PerspectiveCamera camera;
-    std::optional<ShaderPass> invert, gray, gammaCorrection;
+    std::optional<ShaderPass> invert, gray, gammaCorrection, trivial;
     std::optional<ShaderPassLink> shaderPasses;
+    std::optional<RayTracingRenderer> rtRenderer;
+    RayTracingScene rtRendererScene;
 
     // objects
     Skybox *skybox = nullptr;
@@ -171,8 +149,6 @@ public:
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO &io = ImGui::GetIO();
-        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
@@ -187,20 +163,27 @@ public:
         static bool use_gray = false;
         static bool use_gamma = true;
         static bool use_skybox = true;
-        static std::vector<ShaderPass *> passes;
+        static bool use_ray_tracing = false;
         if (use_skybox) {
             currentScene().addChild(skybox);
         } else {
             currentScene().removeChild(skybox);
         }
-        passes.clear();
-        if (use_invert) passes.emplace_back(&invert.value());
-        if (use_gray) passes.emplace_back(&gray.value());
-        if (use_gamma) passes.emplace_back(&gammaCorrection.value());
-        shaderPasses->usePasses(passes.begin(), passes.end());
+
+        shaderPasses->usePasses({
+            {use_invert, &invert.value()},
+            {use_gray,   &gray.value()},
+            {use_gamma,  &gammaCorrection.value()},
+        });
 
         shaderPasses->renderBegin();
-        renderer.render(currentScene(), camera);
+        if (use_ray_tracing) {
+            puts("rendering use rt");
+            rtRenderer->render(rtRendererScene, camera);
+            exit(0);
+        } else {
+            renderer.render(currentScene(), camera);
+        }
         shaderPasses->renderEnd();
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -213,9 +196,8 @@ public:
 
             ImGui::Begin("Assignment 2");
             if (ImGui::Button("load scene...")) {
-//                static constexpr const char *filter[] = {"*.json"};
-//                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
-                const char *path = "assets/scene/scene.json";
+                static constexpr const char *filter[] = {"*.json"};
+                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
                 if (path) {
                     auto obj = loadJsonScene(path);
                     if (!obj) {
@@ -233,19 +215,20 @@ public:
                     }
                 }
             }
-//
-//            if (ImGui::Button("create bounding box")) {
-//                currentScene().traverse([&](Object3D &obj) {
-//                    Mesh *mesh = obj.isMesh();
-//                    if (!mesh) return;
-//                    auto box = mesh->computeBoundingBox();
-//                    Mesh* bbox = new Mesh(std::make_shared<PhongMaterial>(),std::make_shared<BoxGeometry>(box.x1 - box.x0, box.y1 - box.y0, box.z1 - box.z0));
-//                    bbox->material()->color = glm::vec4(0.0, 0.0, 1.0, 0.3);
-//                    bbox->setPosition(glm::vec3{box.x1 + box.x0, box.y1 + box.y0, box.z1 + box.z0} / 2.0f);
-//                    currentScene().addChild(bbox);
-//                });
-//            }
-//
+
+            if (ImGui::Button(use_ray_tracing ? "disable ray tracing" : "enable ray tracing")) {
+                if (use_ray_tracing) {
+                    use_ray_tracing = !use_ray_tracing;
+                } else {
+                    if (!rtRenderer.has_value()) {
+                        rtRenderer.emplace();
+                    }
+                    rtRenderer->init(640, 480);
+                    rtRendererScene.setFromScene(currentScene());
+                    use_ray_tracing = true;
+                }
+            }
+
             ImGui::Text("filters");
 
             ImGui::Checkbox("invert color", &use_invert);
@@ -257,10 +240,10 @@ public:
 
             ImGui::Text("mouse: (%.2f, %.2f)", lastMouseX, lastMouseY);
             ImGui::Text("average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                        ImGui::GetIO().Framerate);
+                ImGui::GetIO().Framerate);
             ImGui::Text("camera: pos(%.2f, %.2f, %.2f) dir(%.2f, %.2f, %.2f)",
-                        camera.position().x, camera.position().y, camera.position().z,
-                        camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
+                camera.position().x, camera.position().y, camera.position().z,
+                camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
             ImGui::End();
         }
         ImGui::Render();

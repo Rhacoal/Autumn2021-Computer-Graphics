@@ -39,10 +39,10 @@ cg::Object3D *cg::loadObj(const char *path) {
     Assimp::Importer importer;
 
     const aiScene *scene = importer.ReadFile(path,
-                                             aiProcess_CalcTangentSpace |
-                                             aiProcess_Triangulate |
-                                             aiProcess_JoinIdenticalVertices |
-                                             aiProcess_SortByPType);
+        aiProcess_CalcTangentSpace |
+        aiProcess_Triangulate |
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_SortByPType);
     if (!scene) {
         fprintf(stderr, "failed to load obj: %s\n%s\n", path, importer.GetErrorString());
         return nullptr;
@@ -113,7 +113,7 @@ cg::Object3D *cg::loadObj(const char *path) {
             aiString diffuse;
             ai_mat->Get(AI_MATKEY_TEXTURE_DIFFUSE(0), diffuse);
             if (diffuse.length) {
-                phong->diffuse = Application::loadTexture(diffuse.C_Str(), Texture::LINEAR);
+                phong->diffuse = Application::loadTexture(diffuse.C_Str(), Texture::Encoding::LINEAR);
             }
             mat = std::move(phong);
         }
@@ -224,8 +224,9 @@ Material *toMaterial(nlohmann::json &obj) {
         stdMat->aoMap = ao.first;
         stdMat->aoIntensity = ao.second;
         auto normal = getTexture("normal", Texture::DefaultTexture::DEFAULT_NORMAL);
-        stdMat->normalMap = normal;
+        stdMat->normalMap = normal.first;
     }
+    return nullptr;
 }
 
 Object3D *toPlaceHolder(nlohmann::json &obj) {

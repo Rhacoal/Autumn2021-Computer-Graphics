@@ -220,20 +220,20 @@ ShaderPassLink::ShaderPassLink(int width, int height) : _width(width), _height(h
 }
 
 void ShaderPassLink::renderBegin() {
-    for (auto &pass : passes) {
+    for (auto &pass : _passes) {
         pass->resize(_width, _height);
     }
-    if (!passes.empty()) {
-        passes[0]->renderBegin();
+    if (!_passes.empty()) {
+        _passes[0]->renderBegin();
     }
 }
 
 void ShaderPassLink::renderEnd() {
-    for (int i = 0; i + 1 < passes.size(); ++i) {
-        passes[i]->thenBegin(*passes[i + 1]);
+    for (int i = 0; i + 1 < _passes.size(); ++i) {
+        _passes[i]->thenBegin(*_passes[i + 1]);
     }
-    if (!passes.empty()) {
-        passes.back()->renderEnd();
+    if (!_passes.empty()) {
+        _passes.back()->renderEnd();
     }
 }
 

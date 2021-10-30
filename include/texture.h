@@ -32,7 +32,9 @@ public:
 
     Texture &operator=(const Texture &rhs) = default;
 
-    void generate(int width, int height, GLenum format);
+    void generate(int width, int height, GLint internalFormat);
+
+    void setData(int width, int height, GLint internalFormat, GLenum format, GLenum type, const void *data);
 
     static Texture defaultTexture(DefaultTexture defaultTexture);
 
