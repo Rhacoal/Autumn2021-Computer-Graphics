@@ -56,14 +56,14 @@ CMakeLists.txt 修改自 LearnOpenGL 系列教程。
     {
       "type": "box",                    // 类型 (立方体)
       "size": [2.0, 2.0, 2.0],          // (立方体) 大小
-      "position": [0.0, 0.0, 0.0, 0.0], // 世界坐标
+      "origin": [0.0, 0.0, 0.0, 0.0], // 世界坐标
       "color": [1.0, 0.5, 0.5],         // 物体颜色
       "rotation": [0.0, 0.0, 0.0, 0.0], // 四元数
       "shininess": 25.0                 // Phong 模型的 shininess (可选)
     }, 
     {
       "type": "placeholder",            // 占位对象，不渲染
-      "position": [0.0, 0.0, 0.0, 0.0],
+      "origin": [0.0, 0.0, 0.0, 0.0],
       "rotation": [1.0, 0.0, 0.0, 0.0],
       "children": []                    // 子对象位置相对于父对象
   ]

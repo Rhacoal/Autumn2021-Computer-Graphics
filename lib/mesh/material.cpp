@@ -48,7 +48,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
         char name[256];
         // TODO cache locations
         for (int i = 0; i < pargs.pointLightCount; ++i) {
-            snprintf(name, 256, "pargs.pointLights[%d].position", pargs.pointLightCount);
+            snprintf(name, 256, "pargs.pointLights[%d].origin", pargs.pointLightCount);
             shader.setUniform3f(name, pargs.pointLights[i].position);
 
             snprintf(name, 256, "pargs.pointLights[%d].direction", pargs.pointLightCount);
@@ -70,7 +70,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, diffuse.has_value() ? diffuse.value().tex() : 0);
 
-        // bind camera position
+        // bind camera origin
         shader.setUniform3f("cameraPosition", cam.worldPosition());
         return sp;
     }
@@ -98,12 +98,12 @@ void cg::StandardMaterial::updateUniforms(cg::Object3D *object, cg::Camera &came
 
 const char *skybox_vert = R"(
 #version 330 core
-layout (location = 0) in vec3 position;
+layout (location = 0) in vec3 origin;
 out vec3 texCoord;
 uniform mat4 vpMatrix;
 void main() {
-    texCoord = position;
-    vec4 pos = vpMatrix * vec4(position, 1.0);
+    texCoord = origin;
+    vec4 pos = vpMatrix * vec4(origin, 1.0);
     gl_Position = pos.xyww;
 }
 )";

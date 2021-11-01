@@ -178,9 +178,7 @@ public:
 
         shaderPasses->renderBegin();
         if (use_ray_tracing) {
-            puts("rendering use rt");
             rtRenderer->render(rtRendererScene, camera);
-            exit(0);
         } else {
             renderer.render(currentScene(), camera);
         }
@@ -225,6 +223,7 @@ public:
                     }
                     rtRenderer->init(640, 480);
                     rtRendererScene.setFromScene(currentScene());
+                    puts("ray tracing set");
                     use_ray_tracing = true;
                 }
             }

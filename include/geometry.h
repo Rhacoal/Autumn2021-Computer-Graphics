@@ -93,7 +93,7 @@ public:
 
     template<typename F>
     void traverseVertices(F &&func) {
-        auto it = attribs.find("position");
+        auto it = attribs.find("origin");
         if (it == attribs.end()) return;
         const auto &pos = it->second.buf;
         if (indices.has_value()) {

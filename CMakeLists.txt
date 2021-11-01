@@ -14,6 +14,11 @@ endif ()
 
 find_package(OpenGL REQUIRED)
 find_package(OpenCL REQUIRED)
+include_directories(${OpenCL_INCLUDE_DIRS})
+
+if (NOT ${OpenCL_Found})
+    message(FATAL_ERROR "OpenCL not found")
+endif ()
 
 if (CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(FATAL_ERROR "Please select another Build Directory ! (and give it a clever name, like bin_Visual2012_64bits/)")
@@ -57,6 +62,7 @@ set(ALL_LIBS
         imgui
         assimp
         tinydialog
+        OpenCL::OpenCL
         ${FRAMEWORKS}
         )
 

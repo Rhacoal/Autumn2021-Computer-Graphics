@@ -2,11 +2,14 @@
 #define ASSIGNMENT_SIMCL_H
 
 #include <cl.hpp>
+#include <cmath>
 
 typedef cl_float2 float2;
 typedef cl_float3 float3;
 typedef cl_float4 float4;
 typedef uint32_t uint;
+typedef uint64_t ulong;
+typedef uint16_t ushort;
 
 #define __global
 #define __kernel
@@ -33,12 +36,41 @@ inline float4 operator*(const float4 &lhs, const float4 &rhs) {
     return float4{lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w + rhs.w};
 }
 
+inline float4 operator*(float lhs, const float4 &rhs) {
+    return float4{rhs.x * lhs, rhs.y * lhs, rhs.z * lhs, rhs.w * lhs};
+}
+
 inline float4 operator*(const float4 &lhs, float rhs) {
     return float4{lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs};
 }
 
+inline float4 operator/(float lhs, const float4 &rhs) {
+    return float4{lhs / rhs.x, lhs / rhs.y, lhs / rhs.z, lhs / rhs.w};
+}
+
 inline float4 operator/(const float4 &lhs, float rhs) {
     return float4{lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs};
+}
+
+inline float length(const float3 &vec) {
+    return std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+}
+
+inline float3 normalize(const float3 &vec) {
+    float len = length(vec);
+    return float3{vec.x / len, vec.y / len, vec.z / len, vec.w};
+}
+
+inline float dot(const float3 &lhs, const float3 &rhs) {
+    return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
+}
+
+inline float3 cross(const float3 &lhs, const float3 &rhs) {
+    return float3{
+        lhs.y * rhs.z - lhs.z * rhs.y,
+        lhs.z * rhs.x - lhs.x * rhs.z,
+        lhs.x * rhs.y - lhs.y * rhs.x,
+    };
 }
 
 #endif //ASSIGNMENT_SIMCL_H

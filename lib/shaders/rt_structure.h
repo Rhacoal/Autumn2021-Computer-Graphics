@@ -10,6 +10,7 @@
 
 struct RayTracingMaterial {
     float4 color;
+    float ior;
 };
 
 typedef struct Vertex {
@@ -18,6 +19,13 @@ typedef struct Vertex {
     float3 texcoord;
     float3 tangent;
 } Vertex;
+
+typedef struct Light {
+    float3 position;
+    float3 color;
+    float intensity;
+    float padding[3];
+};
 
 typedef struct Bounds3 {
     float3 pMin, pMax;
@@ -84,12 +92,15 @@ typedef struct Triangle {
 typedef struct BVHNode {
     Bounds3 bounds;
     uint offset;
-    uint isLeaf;
+    ushort isLeaf;
+    ushort dim;
 } BVHNode;
 
 typedef struct Ray {
-    float3 position;
+    float3 origin;
     float3 direction;
+    char sign[4];
+    float possibility;
 } Ray;
 
 #endif //RT_STRUCTURE_H

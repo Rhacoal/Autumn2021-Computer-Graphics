@@ -70,7 +70,7 @@ cg::Object3D *cg::loadObj(const char *path) {
                 const aiVector3D &vec3 = mesh->mVertices[i];
                 vertices.insert(vertices.end(), {vec3.x, vec3.y, vec3.z});
             }
-            geo->addAttribute("position", vertices.data(), vertices.size(), 3);
+            geo->addAttribute("origin", vertices.data(), vertices.size(), 3);
             vertices.clear();
             // indices
             std::vector<unsigned int> indices;
@@ -158,7 +158,7 @@ Object3D *toObject(nlohmann::json &obj) {
 };
 
 Mesh *toBox(nlohmann::json &obj) {
-    auto &position = obj["position"];
+    auto &position = obj["origin"];
     auto &size = obj["size"];
     auto &rotation = obj["rotation"];
     auto &color = obj["color"];
@@ -230,7 +230,7 @@ Material *toMaterial(nlohmann::json &obj) {
 }
 
 Object3D *toPlaceHolder(nlohmann::json &obj) {
-    auto &position = obj["position"];
+    auto &position = obj["origin"];
     auto &rotation = obj["rotation"];
 
     Object3D *ob = new Object3D;

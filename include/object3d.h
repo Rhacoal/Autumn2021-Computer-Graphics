@@ -61,7 +61,7 @@ class Object3D {
     mutable glm::mat4 _world_matrix;
     mutable bool _need_update = true;
 
-    // position in location coordinates
+    // origin in location coordinates
     glm::vec3 _pos{0.0f, 0.0f, 0.0f};
     glm::quat _quat;
     glm::vec3 _scale{1.0f, 1.0f, 1.0f};

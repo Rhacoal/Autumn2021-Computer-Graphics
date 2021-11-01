@@ -10,17 +10,20 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <functional>
 
 void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
 }
 
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // ray tracing
-    commandQueue.enqueueNDRangeKernel(testKernel, cl::NullRange, frameBufferSize(), cl::NullRange, nullptr);
-    commandQueue.enqueueReadBuffer(testBuffer, CL_FALSE, 0, frameBufferSize(), frameBuffer.data(), nullptr, nullptr);
+    std::vector<cl::Event> evs(1);
+    commandQueue.enqueueNDRangeKernel(testKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr, &evs[0]);
+    commandQueue.enqueueReadBuffer(testBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &evs, nullptr);
     commandQueue.finish();
     // draw to screen
-    texture.setData(_width, _height, GL_RGB, GL_RGB, GL_FLOAT, frameBuffer.data());
+//    std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
+    texture.setData(_width, _height, GL_RGB, GL_RGBA, GL_FLOAT, frameBuffer.data());
     if (!trivialShader.has_value()) {
         trivialShader.emplace();
     }
@@ -28,6 +31,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture.tex());
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
 }
 
 bool cg::RayTracingRenderer::initCL() {
@@ -80,7 +84,7 @@ bool cg::RayTracingRenderer::initCL() {
         }
         text << "Enter a number (1 ~ " << devices.size() << ')';
 
-        device_index = 2;
+        device_index = 0;
         while (device_index == -1) {
             auto text_str = text.str();
             char *ret = tinyfd_inputBox("Select a OpenCL device", text_str.c_str(), "");
@@ -122,9 +126,12 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         _width = width;
         _height = height;
         // prepare buffers
-        frameBuffer.resize(_width * _height * 3);
+        frameBuffer.resize(_width * _height * 4);
+        std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
 //        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, _width * _height * sizeof(Ray), nullptr);
-        testBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, frameBufferSize(), nullptr);
+        testBuffer = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, frameBufferSize(),
+                                frameBuffer.data(), 0);
+        std::fill(frameBuffer.begin(), frameBuffer.end(), 1.0f);
         testKernel.setArg(0, testBuffer());
         testKernel.setArg(1, width);
         testKernel.setArg(2, height);
@@ -146,13 +153,20 @@ void cg::BVH::buildFromTriangles(std::vector<Triangle> &triangles) {
             return push(BVHNode{first->bounds(), baseIndex, 1}); // leaf
         }
         if (length == 2) {
-            auto ret = push(BVHNode{first->bounds() + std::next(first)->bounds(), 0, 0});
-            recur(first, first + 1, baseIndex);                         // left
-            nodes[ret].offset = recur(first + 1, last, baseIndex + 1);  // right
+            auto bounds = first->bounds() + std::next(first)->bounds();
+            unsigned short dim = bounds.maxExtent();
+            auto ret = push(BVHNode{bounds, 0, 0, dim});
+            if (first->bounds().centroid().s[dim] < (std::next(first))->bounds().centroid().s[dim]) {
+                recur(first, std::next(first), baseIndex);                         // left
+                nodes[ret].offset = recur(std::next(first), last, baseIndex + 1);  // right
+            } else {
+                recur(std::next(first), last, baseIndex + 1);                      // right
+                nodes[ret].offset = recur(first, std::next(first), baseIndex + 1); // left
+            }
             return ret;
         }
-        Bounds3 bounds = first->bounds();
-        Bounds3 centroidBounds(bounds.centroid());
+        auto bounds = first->bounds();
+        auto centroidBounds = Bounds3(bounds.centroid());
         for (auto i = std::next(first); i != last; ++i) {
             Bounds3 iBound = i->bounds();
             bounds += iBound;
@@ -164,7 +178,7 @@ void cg::BVH::buildFromTriangles(std::vector<Triangle> &triangles) {
         });
 
         auto leftSize = length / 2;
-        auto ret = push(BVHNode{bounds, 0, 0});
+        auto ret = push(BVHNode{bounds, 0, 0, maxExtend});
         recur(first, first + leftSize, baseIndex);                                  // left
         nodes[ret].offset = recur(first + leftSize, last, baseIndex + leftSize);    // right
         return ret;
