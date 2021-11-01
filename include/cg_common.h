@@ -4,12 +4,15 @@
 #define check_err(x) do{::cg::flush_err();x;::cg::assert_ok();}while(0)
 
 #define GLFW_INCLUDE_NONE
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
 #if defined(_MSC_VER)
+
 #include <BaseTsd.h>
+
 typedef SSIZE_T ssize_t;
 #endif
 
@@ -38,8 +41,9 @@ inline void assert_ok() {
 }
 
 namespace math {
-constexpr double pi() {
-    return 3.14159265358979323846;
+template<typename F = double>
+constexpr F pi() {
+    return F(3.14159265358979323846);
 }
 
 constexpr double radians(double degree) {
@@ -57,7 +61,7 @@ constexpr size_t arraySize(T (&arr)[N]) {
     return N;
 }
 
-inline void printMatrix(const glm::mat4& mat) {
+inline void printMatrix(const glm::mat4 &mat) {
     puts("[");
     for (int i = 0; i < 4; ++i) {
         printf("%f %f %f %f\n", mat[i][0], mat[i][1], mat[i][2], mat[i][3]);

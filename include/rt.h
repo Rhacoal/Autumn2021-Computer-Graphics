@@ -4,8 +4,8 @@
 #include <cg_common.h>
 #include <cg_fwd.h>
 #include <texture.h>
+#include <shader.h>
 #include "lib/shaders/rt_structure.h"
-#include "shader.h"
 
 #include <cl.hpp>
 
@@ -18,17 +18,15 @@ struct BVH {
     void buildFromTriangles(std::vector<Triangle> &triangles);
 };
 
-class RayTracingScene {
+struct RayTracingScene {
+    bool bufferNeedUpdate = true;
+
     BVH bvh;
+    std::vector<Texture> usedTextures;
+    std::vector<Triangle> triangles;
+    std::vector<RayTracingMaterial> materials;
+    std::vector<RayTracingLight> lights;
 
-    // BVH buffer
-    size_t bvhNodeCount;
-    cl::Buffer bvhBuffer;
-
-    // primitives buffer
-    size_t triangleCount;
-    cl::Buffer triangleBuffer;
-public:
     void setFromScene(Scene &scene);
 };
 
@@ -65,7 +63,14 @@ class RayTracingRenderer {
 
     int _width{}, _height{};
     cl::Buffer rayBuffer;
-    cl::Buffer testBuffer;
+    cl::Buffer outputBuffer;
+
+    // scene related buffers
+    cl::Buffer textureBuffer;
+    cl::Buffer triangleBuffer;
+    cl::Buffer materialBuffer;
+    cl::Buffer bvhBuffer;
+    cl::Buffer lightBuffer;
 
     std::vector<float> frameBuffer;
 

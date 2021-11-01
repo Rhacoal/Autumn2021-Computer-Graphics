@@ -149,6 +149,11 @@ class BoxGeometry : public Geometry {
 public:
     BoxGeometry(float sizeX, float sizeY, float sizeZ, Side side = Side::FrontSide);
 };
+
+class SphereGeometry : public Geometry {
+public:
+    SphereGeometry(float radius, int widthSegments, int heightSegments);
+};
 }
 
 #endif //ASSIGNMENT_GEOMETRY_H

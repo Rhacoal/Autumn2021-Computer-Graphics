@@ -20,6 +20,10 @@ public:
         return this;
     }
 
+    virtual cg::PerspectiveCamera *isPerspectiveCamera() {
+        return nullptr;
+    }
+
     virtual glm::mat4 viewMatrix() const {
         return worldMatrix();
     }
@@ -53,6 +57,10 @@ public:
         updateParameter(fov, near, far, aspect_ratio);
     }
 
+    virtual cg::PerspectiveCamera *isPerspectiveCamera() override {
+        return this;
+    }
+
     void updateParameter(float fov, float near, float far, float aspect_ratio) {
         this->_fov = fov;
         this->_near = near;
@@ -67,7 +75,7 @@ public:
     }
 
     void updateMatrix() {
-        float top = _near * tan(math::pi() * 0.5f * _fov / 180.0f) / _zoom;
+        float top = _near * tan(math::pi<float>() * 0.5f * _fov / 180.0f) / _zoom;
         float height = 2.0f * top;
         float width = _aspect_ratio * height;
         float left = -0.5f * width;
@@ -76,6 +84,22 @@ public:
         float bottom = top - height;
         _project = glm::perspective(glm::radians(_fov), _aspect_ratio, _near, _far);
 //        makePerspective(_project, left, right, top, bottom, _near, _far);
+    }
+
+    float fov() const {
+        return _fov;
+    }
+
+    float aspect_ratio() const {
+        return _aspect_ratio;
+    }
+
+    float near() const {
+        return _near;
+    }
+
+    float far() const {
+        return _far;
     }
 };
 

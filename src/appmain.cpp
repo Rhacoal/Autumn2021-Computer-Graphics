@@ -116,6 +116,8 @@ public:
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
+        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 30, 20));
+        currentScene().addChild(sphere);
 
         // control
         glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -171,16 +173,16 @@ public:
         }
 
         shaderPasses->usePasses({
-            {use_invert, &invert.value()},
-            {use_gray,   &gray.value()},
-            {use_gamma,  &gammaCorrection.value()},
-        });
+                                    {use_invert, &invert.value()},
+                                    {use_gray,   &gray.value()},
+                                    {use_gamma,  &gammaCorrection.value()},
+                                });
 
         shaderPasses->renderBegin();
         if (use_ray_tracing) {
             rtRenderer->render(rtRendererScene, camera);
         } else {
-            // renderer.render(currentScene(), camera);
+            renderer.render(currentScene(), camera);
         }
         shaderPasses->renderEnd();
 
@@ -239,10 +241,10 @@ public:
 
             ImGui::Text("mouse: (%.2f, %.2f)", lastMouseX, lastMouseY);
             ImGui::Text("average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                ImGui::GetIO().Framerate);
+                        ImGui::GetIO().Framerate);
             ImGui::Text("camera: pos(%.2f, %.2f, %.2f) dir(%.2f, %.2f, %.2f)",
-                camera.position().x, camera.position().y, camera.position().z,
-                camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
+                        camera.position().x, camera.position().y, camera.position().z,
+                        camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
             ImGui::End();
         }
         ImGui::Render();

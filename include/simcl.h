@@ -2,6 +2,8 @@
 #define ASSIGNMENT_SIMCL_H
 
 #include <cl.hpp>
+#include <glm/glm.hpp>
+
 #include <cmath>
 
 typedef cl_float2 float2;
@@ -58,6 +60,14 @@ inline float4 operator+(const float4 &f4) {
 
 inline float4 operator-(const float4 &f4) {
     return float4{-f4.x, -f4.y, -f4.z, -f4.w};
+}
+
+inline float4 toFloat4(const glm::vec4 &vec) {
+    return float4{vec.x, vec.y, vec.z, vec.w};
+}
+
+inline float3 toFloat3(const glm::vec3 &vec) {
+    return float3{vec.x, vec.y, vec.z};
 }
 
 inline float length(const float3 &vec) {

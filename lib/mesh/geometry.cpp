@@ -157,53 +157,59 @@ cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ, Side side) {
     } else {
         addIndices(indices, 36);
     }
+}
 
-//    float positions[] = {
-//        -half_x, -half_y, -half_z,
-//        half_x, -half_y, -half_z,
-//        half_x, half_y, -half_z,
-//        -half_x, half_y, -half_z,
-//        -half_x, -half_y, half_z,
-//        half_x, -half_y, half_z,
-//        half_x, half_y, half_z,
-//        -half_x, half_y, half_z,
-//    };
-//    float normals[] = {
-//    };
-//    float colors[] = {
-//        0.0f, 0.0f, 0.0f,
-//        1.0f, 0.0f, 0.0f,
-//        1.0f, 1.0f, 0.0f,
-//        0.0f, 1.0f, 0.0f,
-//        0.0f, 0.0f, 1.0f,
-//        1.0f, 0.0f, 1.0f,
-//        1.0f, 1.0f, 1.0f,
-//        0.0f, 1.0f, 1.0f,
-//    };
-//    unsigned int indices[] = {
-//        // front side
-//        0, 2, 1, 0, 3, 2,
-//        1, 6, 5, 1, 2, 6,
-//        5, 7, 4, 5, 6, 7,
-//        4, 3, 0, 4, 7, 3,
-//        2, 7, 6, 2, 3, 7,
-//        0, 5, 4, 0, 1, 5,
-//
-//        // back side
-//        0, 1, 2, 0, 2, 3,
-//        1, 5, 6, 1, 6, 2,
-//        5, 4, 7, 5, 7, 6,
-//        4, 0, 3, 4, 3, 7,
-//        2, 6, 7, 2, 7, 3,
-//        0, 4, 5, 0, 5, 1,
-//    };
-//    addAttribute("position", positions, 3);
-//    addAttribute("color", colors, 3);
-//    if (side == Side::FrontSide) {
-//        addIndices(indices, 36);
-//    } else if (side == Side::BackSide) {
-//        addIndices(indices + 36, 36);
-//    } else if (side == Side::DoubleSide) {
-//        addIndices(indices, 72);
-//    }
+cg::SphereGeometry::SphereGeometry(float radius, int widthSegments, int heightSegments) {
+    int vertexCount = (widthSegments + 1) * (heightSegments + 1);
+    std::vector<float> position(vertexCount * 3);
+    std::vector<float> normal(vertexCount * 3);
+    std::vector<float> texcoord(vertexCount * 2);
+    std::vector<unsigned int> indices(widthSegments * (2 * heightSegments - 1) * 3);
+    int index = 0;
+    for (int i = 0; i <= heightSegments; ++i) {
+        float v = (float) i / (float) heightSegments;
+        float theta = math::pi<float>() * v;
+        float y = cos(theta);
+        for (int j = 0; j <= widthSegments; ++j) {
+            float u = (float) j / (float) widthSegments;
+            float phi = math::pi<float>() * 2 * u;
+            float x = cos(phi) * sin(theta);
+            float z = -sin(phi) * sin(theta);
+            position[index * 3 + 0] = radius * x;
+            position[index * 3 + 1] = radius * y;
+            position[index * 3 + 2] = radius * z;
+            normal[index * 3 + 0] = x;
+            normal[index * 3 + 1] = y;
+            normal[index * 3 + 2] = z;
+            texcoord[index * 2 + 0] = u;
+            texcoord[index * 2 + 1] = v;
+            ++index;
+        }
+    }
+    const auto getIndex = [&](int i, int j) {
+        return i * (widthSegments + 1) + j;
+    };
+    index = 0;
+    for (int i = 0; i < heightSegments; ++i) {
+        for (int j = 0; j < widthSegments; ++j) {
+            int v0 = getIndex(i, j);
+            int v1 = getIndex(i + 1, j);
+            int v2 = getIndex(i + 1, j + 1);
+            int v3 = getIndex(i, j + 1);
+            if (i != heightSegments) {
+                indices[index++] = v0;
+                indices[index++] = v1;
+                indices[index++] = v2;
+            }
+            if (i != 0) {
+                indices[index++] = v0;
+                indices[index++] = v2;
+                indices[index++] = v3;
+            }
+        }
+    }
+    addAttribute("position", position.data(), position.size(), 3);
+    addAttribute("normal", normal.data(), normal.size(), 3);
+    addAttribute("texcoord", texcoord.data(), texcoord.size(), 2);
+    addIndices(indices.data(), indices.size());
 }

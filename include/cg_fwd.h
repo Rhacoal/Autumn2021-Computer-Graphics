@@ -50,7 +50,7 @@ class PointLight;
 
 class AmbientLight;
 
-class RayTracingScene;
+struct RayTracingScene;
 
 class RayTracingRenderer;
 }

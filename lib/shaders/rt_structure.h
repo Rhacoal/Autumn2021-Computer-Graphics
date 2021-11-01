@@ -13,6 +13,10 @@ typedef struct RayTracingMaterial {
     float ior;
 } RayTracingMaterial;
 
+typedef struct RayTracingLight {
+    float4 color;
+} RayTracingLight;
+
 typedef struct Vertex {
     float3 position;
     float3 normal;
@@ -75,7 +79,7 @@ typedef struct Bounds3 {
 
 typedef struct Triangle {
     Vertex v0, v1, v2;
-    int mtlIndex;
+    uint mtlIndex;
 
 #ifdef __cplusplus
 

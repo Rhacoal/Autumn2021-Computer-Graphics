@@ -13,11 +13,14 @@
 #include <sstream>
 #include <algorithm>
 #include <functional>
+#include <random>
 
 void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
-    std::vector<RayTracingMaterial> rtMaterial;
+    bufferNeedUpdate = true;
+    materials.clear();
+    triangles.clear();
+    lights.clear();
     std::map<Material *, uint32_t> mtlMap;
-    std::vector<Triangle> triangles;
     scene.traverse([&](Object3D &object) {
         Mesh *mesh = object.isMesh();
         if (!mesh) return;
@@ -30,34 +33,40 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             }
             return {};
         };
-        uint32_t mtlIndex;
+        uint mtlIndex;
         auto mtlIt = mtlMap.find(mtl);
         if (mtlIt != mtlMap.end()) {
             mtlIndex = mtlIt->second;
         } else {
-            auto mtl = RayTracingMaterial {
+            auto rtMtl = RayTracingMaterial{
                 .color = {0.5f, 0.5f, 1.0f, 1.0f},
                 .ior = 1.35f,
             };
+            mtlIndex = materials.size();
+            mtlMap[mtl] = mtlIndex;
+            materials.emplace_back(rtMtl);
         }
         auto position = bufInfo(geometry->getAttribute("position"));
         if (!position.has_value()) return;
         auto texcoord = bufInfo(geometry->getAttribute("texcoord"));
         auto normal = bufInfo(geometry->getAttribute("normal"));
         const auto addTriangle = [&](unsigned int v0, unsigned int v1, unsigned int v2) {
-            Triangle triangle{};
-            if (true) {
-                auto[buf, size] = position.value();
-                triangle.v0.position = float3{buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2]};
-                triangle.v1.position = float3{buf[v1 * size + 0], buf[v1 * size + 1], buf[v1 * size + 2]};
-                triangle.v2.position = float3{buf[v2 * size + 0], buf[v2 * size + 1], buf[v2 * size + 2]};
-            }
+            Triangle triangle{
+                .mtlIndex = mtlIndex,
+            };
+            // position
+            auto[buf, size] = position.value();
+            triangle.v0.position = float3{buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2]};
+            triangle.v1.position = float3{buf[v1 * size + 0], buf[v1 * size + 1], buf[v1 * size + 2]};
+            triangle.v2.position = float3{buf[v2 * size + 0], buf[v2 * size + 1], buf[v2 * size + 2]};
+            // texcoord
             if (texcoord.has_value()) {
                 auto[buf, size] = texcoord.value();
                 triangle.v0.texcoord = float3{buf[v0 * size + 0], buf[v0 * size + 1]};
                 triangle.v1.texcoord = float3{buf[v1 * size + 0], buf[v1 * size + 1]};
                 triangle.v2.texcoord = float3{buf[v2 * size + 0], buf[v2 * size + 1]};
             }
+            // normal
             if (normal.has_value()) {
                 auto[buf, size] = normal.value();
                 triangle.v0.normal = float3{buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2]};
@@ -77,18 +86,71 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             }
         }
     });
+    bvh.buildFromTriangles(triangles);
 }
 
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
+    // update buffers (if needed)
+    if (scene.bufferNeedUpdate) {
+        // TODO actually fill in these buffers
+        textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 0, nullptr);
+        triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 0, nullptr);
+        materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, scene.materials.size() * sizeof(RayTracingMaterial),
+                                    scene.materials.data());
+        bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, scene.bvh.nodes.size() * sizeof(BVHNode),
+                               scene.bvh.nodes.data());
+        std::random_device r{};
+        std::default_random_engine engine{r()};
+
+        // __global Ray *output,
+        rayGenerationKernel.setArg(0, outputBuffer());
+        // uint width, uint height,
+        rayGenerationKernel.setArg(1, _width);
+        rayGenerationKernel.setArg(2, _height);
+        // ulong globalSeed,
+        rayGenerationKernel.setArg(3, std::uniform_int_distribution<ulong>{}(engine));
+        // float3 cameraPosition, float3 cameraDir, float3 cameraUp,
+        rayGenerationKernel.setArg(4, toFloat3(camera.position()));
+        rayGenerationKernel.setArg(5, toFloat3(camera.lookDir()));
+        rayGenerationKernel.setArg(6, toFloat3(camera.up()));
+
+        // __global float4 *output, uint width, uint height,
+        renderKernel.setArg(0, outputBuffer());
+        renderKernel.setArg(1, _width);
+        renderKernel.setArg(2, _height);
+        // __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
+        renderKernel.setArg(3, bvhBuffer());
+        renderKernel.setArg(4, triangleBuffer());
+        renderKernel.setArg(5, materialBuffer());
+        // __global Ray *rays, uint bounces,
+        renderKernel.setArg(6, rayBuffer());
+        renderKernel.setArg(7, (uint) 1);
+        // ulong globalSeed, uint spp
+        renderKernel.setArg(8, std::uniform_int_distribution<ulong>{}(engine));
+        renderKernel.setArg(9, (uint) 1);
+
+        scene.bufferNeedUpdate = false;
+    }
+    // update camera
+    auto perspective = camera.isPerspectiveCamera();
+    if (!perspective) {
+        throw std::runtime_error("Only perspective camera can be used for path tracing.");
+    }
+    // float fov, float near
+    rayGenerationKernel.setArg(7, perspective->fov());
+    rayGenerationKernel.setArg(8, perspective->near());
+
     // ray tracing
-    std::vector<cl::Event> evs(1);
-    commandQueue.enqueueNDRangeKernel(testKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr,
-        &evs[0]);
-    commandQueue.enqueueReadBuffer(testBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &evs, nullptr);
-//    commandQueue.enqueueReadBuffer(testBuffer, CL_TRUE, 0, 100 * 3, test, &evs, nullptr);
+    std::vector<cl::Event> rayGenEvent;
+    commandQueue.enqueueNDRangeKernel(rayGenerationKernel, cl::NullRange, _width * _height, cl::NullRange,
+                                      nullptr, rayGenEvent.data());
+    std::vector<cl::Event> raytracingEvent(1);
+    commandQueue.enqueueNDRangeKernel(rayGenerationKernel, cl::NullRange, _width * _height, cl::NullRange,
+                                      &rayGenEvent, raytracingEvent.data());
+    commandQueue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &raytracingEvent,
+                                   nullptr);
     commandQueue.finish();
     // draw to screen
-//    std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
     texture.setData(_width, _height, GL_RGB, GL_RGBA, GL_FLOAT, frameBuffer.data());
     if (!trivialShader.has_value()) {
         trivialShader.emplace();
@@ -105,13 +167,14 @@ bool cg::RayTracingRenderer::initCL() {
     // Get all available OpenCL platforms (e.g. AMD OpenCL, Nvidia CUDA, Intel OpenCL)
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
+    const const char *endl = "\\r\\n";
     int platform_index = -1;
     {
         std::stringstream text;
-        text << "Available OpenCL platforms:" << std::endl;
+        text << "Available OpenCL platforms:" << endl;
         for (int i = 0; i < platforms.size(); ++i) {
             auto name = platforms[i].getInfo<CL_PLATFORM_NAME>();
-            text << "    " << i + 1 << ": " << name.c_str() << std::endl;
+            text << "    " << i + 1 << ": " << name.c_str() << endl;
         }
         text << "Enter a number: (1 ~ " << platforms.size() << ')';
 
@@ -138,15 +201,15 @@ bool cg::RayTracingRenderer::initCL() {
         std::stringstream text;
         auto platform_name = platform.getInfo<CL_PLATFORM_NAME>();
         text << "Available OpenCL devices on this platform: "
-             << platform_name.c_str() << std::endl << std::endl;
+             << platform_name.c_str() << endl << endl;
         for (int i = 0; i < devices.size(); i++) {
             auto name = devices[i].getInfo<CL_DEVICE_NAME>();
             text << "\t" << i + 1 << ": "
-                 << name.c_str() << std::endl;
+                 << name.c_str() << endl;
             text << "\t\tMax compute units: "
-                 << devices[i].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << std::endl;
+                 << devices[i].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << endl;
             text << "\t\tMax work group size: "
-                 << devices[i].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << std::endl << std::endl;
+                 << devices[i].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << endl << endl;
         }
         text << "Enter a number (1 ~ " << devices.size() << ')';
 
@@ -185,7 +248,6 @@ bool cg::RayTracingRenderer::init(int width, int height) {
             puts(buildLog.c_str());
             return false;
         }
-        testKernel = cl::Kernel(program, "test_kernel");
         rayGenerationKernel = cl::Kernel(program, "raygeneration_kernel");
         renderKernel = cl::Kernel(program, "render_kernel");
         programInited = true;
@@ -196,17 +258,10 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         // prepare buffers
         frameBuffer.resize(_width * _height * 4);
         std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
-        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, _width * _height * sizeof(Ray), nullptr);
+
         int err;
-        testBuffer = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, frameBufferSize(),
-            frameBuffer.data(), &err);
-        if (err) {
-            fprintf(stderr, "Error creaing buffer: %d\n", err);
-        }
-        std::fill(frameBuffer.begin(), frameBuffer.end(), 1.0f);
-        testKernel.setArg(0, testBuffer());
-        testKernel.setArg(1, width);
-        testKernel.setArg(2, height);
+        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr, &err);
+        if (err) { fprintf(stderr, "Error creaing buffer: %d\n", err); }
     }
     return true;
 }

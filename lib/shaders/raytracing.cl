@@ -144,11 +144,10 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
 __kernel void raygeneration_kernel(
     __global Ray *output,
     uint width, uint height, ulong globalSeed,
-    // cameraZ = -dir, cameraX = cross(dir, up), cameraY = cross(z, x)
-    float3 cameraPosition, float3 cameraX, float3 cameraY, float3 cameraZ, float fov, float near
+    float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
     const int pixel_id = get_global_id(0);
-    ulong seed = pixel_id ^globalSeed;
+    ulong seed = pixel_id ^ globalSeed;
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
     float ndc_x = (pixel_x / width) * 2.0f - 1.0f;
@@ -160,7 +159,9 @@ __kernel void raygeneration_kernel(
 #else
     float3 near_pos = (float3) (ndc_x * top * aspect, ndc_y * top, -near);
 #endif
-    float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * cameraZ;
+    float3 cameraX = cross(cameraDir, cameraUp);
+    float3 cameraY = cross(cameraX, cameraDir);
+    float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * (-cameraDir);
 
     Ray ray;
     ray.origin = cameraPosition;
@@ -168,7 +169,6 @@ __kernel void raygeneration_kernel(
     ray.sign[0] = ray.direction.x > 0;
     ray.sign[1] = ray.direction.y > 0;
     ray.sign[2] = ray.direction.z > 0;
-    ray.possibility = 1.0f;
 }
 
 __kernel void render_kernel(
@@ -176,10 +176,8 @@ __kernel void render_kernel(
     __global float4 *output, uint width, uint height,
     // primitives and materials
     __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
-    // lighting
-//    __global Light *lights, uint lightCount,
     // path tracing
-    __global Ray *rays, int bounces,
+    __global Ray *rays, uint bounces,
     // sampling
     ulong globalSeed, uint spp
 ) {
@@ -192,17 +190,32 @@ __kernel void render_kernel(
 #endif
 
     // a maximum of 15 bounces is allowed
-    float3 stack[16][2];
+    struct {
+        int mltIndex;
+        uint primtiveIndex;
+        float3 wo;
+        float3 p;
+    } stack[16][2];
+    int bcnt = 0;
     Intersection intersection;
     if (firstIntersection(ray, bvh, triangles, &intersection)) {
         // iteratively select directions
         for (int i = 0; i < bounces; ++i) {
             float3 wo = -ray.direction;
             float3 p = intersection.position;
-            __global RayTracingMaterial *mtl = materials + triangles[intersection.index].mtlIndex;
+//            __global RayTracingMaterial *mtl = materials + triangles[intersection.index].mtlIndex;
+            bcnt += 1;
+            stack[i].wo = wo;
+            stack[i].p = p;
+            stack[i].mtlIndex = triangles[intersection.index].mtlIndex;
+            stack[i].primtiveIndex = intersection.index;
         }
     } else {
         // TODO draw sky
+    }
+
+    for (int i = 0; i < bct; ++i) {
+        color.r += 1.0f;
     }
 
     uint x = pixel_id % width;
@@ -211,8 +224,9 @@ __kernel void render_kernel(
     float fy = (float) y / (float) height;
     output[pixel_id] =
 #ifdef __cplusplus
-        float4{fx, fy, 0.0f, 1.0f};
+        float4{color.x / spp, color.y / spp, color.z / spp, 1.0f};
 #else
+    (float4)(color / spp, 1.0);
     (float4)(fx, fy, 0, 1.0);
 #endif
 }
