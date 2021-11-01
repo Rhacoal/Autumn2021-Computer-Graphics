@@ -150,7 +150,7 @@ cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ, Side side) {
     for (auto func : funcs) {
         func(ptr_pos, ptr_norm, ptr_idx, index0, sizes, side != Side::BackSide, side != Side::FrontSide);
     }
-    addAttribute("origin", positions, 3);
+    addAttribute("position", positions, 3);
     addAttribute("normal", normals, 3);
     if (side == Side::DoubleSide) {
         addIndices(indices, 72);
@@ -197,7 +197,7 @@ cg::BoxGeometry::BoxGeometry(float sizeX, float sizeY, float sizeZ, Side side) {
 //        2, 6, 7, 2, 7, 3,
 //        0, 4, 5, 0, 5, 1,
 //    };
-//    addAttribute("origin", positions, 3);
+//    addAttribute("position", positions, 3);
 //    addAttribute("color", colors, 3);
 //    if (side == Side::FrontSide) {
 //        addIndices(indices, 36);

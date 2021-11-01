@@ -1,5 +1,9 @@
 #include "lib/shaders/rt_structure.h"
 
+int next(ulong *, int);
+
+float randomFloat(ulong *);
+
 int next(ulong *seed, int bits) {
     *seed = (*seed * 0x5DEECE66DL + 0xBL) & (((ulong) 1ul << 48) - 1);
     return (int) (*seed >> (48 - bits));
@@ -18,6 +22,12 @@ typedef struct Intersection {
     float distance;
 } Intersection;
 
+bool intersect(Ray, Triangle, Intersection *);
+
+bool boundsRayIntersects(Ray, Bounds3);
+
+bool firstIntersection(Ray, __global BVHNode *, __global Triangle *, Intersection *);
+
 /**
  * Checks if a ray intersects with a triangle.
  * @param ray the ray to check
@@ -26,43 +36,32 @@ typedef struct Intersection {
  * @return whether the ray and the triangle intersects
  */
 bool intersect(Ray ray, Triangle triangle, Intersection *intersection) {
+    // Reference:
+    // scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
+
     float3 e01 = triangle.v1.position - triangle.v0.position;
     float3 e02 = triangle.v2.position - triangle.v0.position;
-    float3 normal = cross(e01, e02);
-    float area = length(normal) * 0.5f;
-    float nl = dot(ray.direction, normal);
-    if (abs(nl) < 0.001f) { // parallel
-        return false;
-    }
 
-    float d = dot(triangle.v0.position - ray.origin, normal) / nl;
-    if (d < 0) { // triangle behind ray
-        return false;
-    }
-    float3 p = ray.origin + ray.direction * d;
-    float3 e0p = p - triangle.v0.position;
-    float invArea2 = 1.0f / normal;
+    float3 pvec = cross(ray.direction, e02);
+    float det = dot(e01, pvec);
+    if (fabs(det) < 1e-3) return false;
+    float invDet = 1 / det;
 
-    w = cross(e01, e0p) * invArea2;
-    if (w < 0) { // v0P is right to v0v1
-        return false;
-    }
+    float3 tvec = ray.origin - triangle.v0.position;
+    float u = dot(tvec, pvec) * invDet;
+    if (u < 0 || u > 1) return false;
 
-    v = cross(e0p, e02) * invArea2;
-    if (v < 0) { // v0P is left to v0v2
-        return false;
-    }
+    float3 qvec = cross(tvec, e01);
+    float v = dot(ray.direction, qvec) * invDet;
+    if (v < 0 || u + v > 1) return false;
 
-    float u = 1 - w - v;
-    if (u < 0) { // P is too far from v0
-        return false;
-    }
+    float t = dot(e02, qvec) * invDet;
 
-    intersection->barycentric.x = u;
-    intersection->barycentric.y = v;
-    intersection->barycentric.z = w;
-    intersection->position = p;
-    intersection->side = nl > 0;
+    intersection->barycentric.x = 1 - u - v;
+    intersection->barycentric.y = u;
+    intersection->barycentric.z = v;
+    intersection->position = ray.origin + t * ray.direction;
+    intersection->side = det < 0;
     return true;
 }
 
@@ -74,7 +73,7 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
 #endif
     // Reference:
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
-    float3 bounds[2] = {bounds.pMin, bounds.pMax};
+    float3 bounds[2] = {bounds3.pMin, bounds3.pMax};
     float tmin, tmax, tymin, tymax, tzmin, tzmax;
 
     tmin = (bounds[ray.sign[0]].x - ray.origin.x) * inverseRay.x;
@@ -89,8 +88,8 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
     if (tymax < tmax)
         tmax = tymax;
 
-    tzmin = (bounds[r.sign[2]].z - ray.origin.z) * inverseRay.z;
-    tzmax = (bounds[1 - r.sign[2]].z - ray.origin.z) * inverseRay.z;
+    tzmin = (bounds[ray.sign[2]].z - ray.origin.z) * inverseRay.z;
+    tzmax = (bounds[1 - ray.sign[2]].z - ray.origin.z) * inverseRay.z;
 
     if ((tmin > tzmax) || (tzmin > tmax))
         return false;
@@ -102,7 +101,7 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
     return true;
 }
 
-bool firstIntersection(Ray ray, BVHNode *bvh, Triangle *primitives, Intersection *output) {
+bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primitives, Intersection *output) {
     // TODO: fix possible stack overflow
     uint stack[64], stackSize;
     stack[0] = 0;
@@ -134,7 +133,7 @@ bool firstIntersection(Ray ray, BVHNode *bvh, Triangle *primitives, Intersection
             if (boundsRayIntersects(ray, bvh[nodeIdx + 1].bounds)) {
                 stack[++stackSize] = nodeIdx + 1;
             }
-            if (boundsRayIntersects(ray, bvh[node.offset])) {
+            if (boundsRayIntersects(ray, bvh[node.offset].bounds)) {
                 stack[++stackSize] = node.offset;
             }
         }
@@ -142,14 +141,14 @@ bool firstIntersection(Ray ray, BVHNode *bvh, Triangle *primitives, Intersection
     return hasIntersection;
 }
 
-__kernel void generateRays(
+__kernel void raygeneration_kernel(
     __global Ray *output,
     uint width, uint height, ulong globalSeed,
     // cameraZ = -dir, cameraX = cross(dir, up), cameraY = cross(z, x)
     float3 cameraPosition, float3 cameraX, float3 cameraY, float3 cameraZ, float fov, float near
 ) {
     const int pixel_id = get_global_id(0);
-    ulong seed = pixel_id ^ globalSeed;
+    ulong seed = pixel_id ^globalSeed;
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
     float ndc_x = (pixel_x / width) * 2.0f - 1.0f;
@@ -178,11 +177,9 @@ __kernel void render_kernel(
     // primitives and materials
     __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
     // lighting
-    __global Light *lights, uint lightCount,
-    // sky
-    __global Skybox *skybox,
+//    __global Light *lights, uint lightCount,
     // path tracing
-    __global Rays *rays, uint bounces,
+    __global Ray *rays, int bounces,
     // sampling
     ulong globalSeed, uint spp
 ) {
@@ -202,7 +199,7 @@ __kernel void render_kernel(
         for (int i = 0; i < bounces; ++i) {
             float3 wo = -ray.direction;
             float3 p = intersection.position;
-            RayTracingMaterial *mtl = materials[triangles[intersection.index].mtlIndex];
+            __global RayTracingMaterial *mtl = materials + triangles[intersection.index].mtlIndex;
         }
     } else {
         // TODO draw sky
@@ -214,7 +211,21 @@ __kernel void render_kernel(
     float fy = (float) y / (float) height;
     output[pixel_id] =
 #ifdef __cplusplus
-        float4{fx, fy, 0f, 1.0f};
+        float4{fx, fy, 0.0f, 1.0f};
+#else
+    (float4)(fx, fy, 0, 1.0);
+#endif
+}
+
+__kernel void test_kernel(__global float4 *output, uint width, uint height) {
+    int pixel_id = get_global_id(0);
+    uint x = pixel_id % width;
+    uint y = pixel_id / width;
+    float fx = (float) x / (float) width;
+    float fy = (float) y / (float) height;
+    output[pixel_id] =
+#ifdef __cplusplus
+        float4{fx, fy, 0.0f, 1.0f};
 #else
     (float4)(fx, fy, 0, 1.0);
 #endif

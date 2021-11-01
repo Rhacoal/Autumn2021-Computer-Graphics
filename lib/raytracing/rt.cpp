@@ -2,6 +2,8 @@
 #include <scene.h>
 #include <camera.h>
 #include <geometry.h>
+#include <material.h>
+#include <mesh.h>
 
 #include <cl.hpp>
 #include <tinyfiledialogs.h>
@@ -13,13 +15,77 @@
 #include <functional>
 
 void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
+    std::vector<RayTracingMaterial> rtMaterial;
+    std::map<Material *, uint32_t> mtlMap;
+    std::vector<Triangle> triangles;
+    scene.traverse([&](Object3D &object) {
+        Mesh *mesh = object.isMesh();
+        if (!mesh) return;
+        Geometry *geometry = mesh->geometry();
+        Material *mtl = mesh->material();
+        auto bufInfo = [](
+            const std::optional<const Geometry::Attribute *> &buf) -> std::optional<std::pair<const Geometry::buffer_t, unsigned int>> {
+            if (buf.has_value()) {
+                return std::make_optional(std::make_pair(buf.value()->buf, buf.value()->itemSize));
+            }
+            return {};
+        };
+        uint32_t mtlIndex;
+        auto mtlIt = mtlMap.find(mtl);
+        if (mtlIt != mtlMap.end()) {
+            mtlIndex = mtlIt->second;
+        } else {
+            auto mtl = RayTracingMaterial {
+                .color = {0.5f, 0.5f, 1.0f, 1.0f},
+                .ior = 1.35f,
+            };
+        }
+        auto position = bufInfo(geometry->getAttribute("position"));
+        if (!position.has_value()) return;
+        auto texcoord = bufInfo(geometry->getAttribute("texcoord"));
+        auto normal = bufInfo(geometry->getAttribute("normal"));
+        const auto addTriangle = [&](unsigned int v0, unsigned int v1, unsigned int v2) {
+            Triangle triangle{};
+            if (true) {
+                auto[buf, size] = position.value();
+                triangle.v0.position = float3{buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2]};
+                triangle.v1.position = float3{buf[v1 * size + 0], buf[v1 * size + 1], buf[v1 * size + 2]};
+                triangle.v2.position = float3{buf[v2 * size + 0], buf[v2 * size + 1], buf[v2 * size + 2]};
+            }
+            if (texcoord.has_value()) {
+                auto[buf, size] = texcoord.value();
+                triangle.v0.texcoord = float3{buf[v0 * size + 0], buf[v0 * size + 1]};
+                triangle.v1.texcoord = float3{buf[v1 * size + 0], buf[v1 * size + 1]};
+                triangle.v2.texcoord = float3{buf[v2 * size + 0], buf[v2 * size + 1]};
+            }
+            if (normal.has_value()) {
+                auto[buf, size] = normal.value();
+                triangle.v0.normal = float3{buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2]};
+                triangle.v1.normal = float3{buf[v1 * size + 0], buf[v1 * size + 1], buf[v1 * size + 2]};
+                triangle.v2.normal = float3{buf[v2 * size + 0], buf[v2 * size + 1], buf[v2 * size + 2]};
+            }
+        };
+        if (geometry->hasIndices()) {
+            const auto indices = geometry->getIndices().value();
+            for (unsigned int i = 0; i < indices.size() - 2; i += 3) {
+                addTriangle(indices[i], indices[i + 1], indices[i + 2]);
+            }
+        } else {
+            const size_t vertices = position.value().first.size();
+            for (size_t i = 0; i < vertices - 2; i += 3) {
+                addTriangle(i, i + 1, i + 2);
+            }
+        }
+    });
 }
 
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // ray tracing
     std::vector<cl::Event> evs(1);
-    commandQueue.enqueueNDRangeKernel(testKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr, &evs[0]);
+    commandQueue.enqueueNDRangeKernel(testKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr,
+        &evs[0]);
     commandQueue.enqueueReadBuffer(testBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &evs, nullptr);
+//    commandQueue.enqueueReadBuffer(testBuffer, CL_TRUE, 0, 100 * 3, test, &evs, nullptr);
     commandQueue.finish();
     // draw to screen
 //    std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
@@ -84,7 +150,7 @@ bool cg::RayTracingRenderer::initCL() {
         }
         text << "Enter a number (1 ~ " << devices.size() << ')';
 
-        device_index = 0;
+//        device_index = 0;
         while (device_index == -1) {
             auto text_str = text.str();
             char *ret = tinyfd_inputBox("Select a OpenCL device", text_str.c_str(), "");
@@ -119,7 +185,9 @@ bool cg::RayTracingRenderer::init(int width, int height) {
             puts(buildLog.c_str());
             return false;
         }
-        testKernel = cl::Kernel(program, "render_kernel");
+        testKernel = cl::Kernel(program, "test_kernel");
+        rayGenerationKernel = cl::Kernel(program, "raygeneration_kernel");
+        renderKernel = cl::Kernel(program, "render_kernel");
         programInited = true;
     }
     if (width != _width || height != _height) {
@@ -128,9 +196,13 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         // prepare buffers
         frameBuffer.resize(_width * _height * 4);
         std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
-//        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, _width * _height * sizeof(Ray), nullptr);
+        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, _width * _height * sizeof(Ray), nullptr);
+        int err;
         testBuffer = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, frameBufferSize(),
-                                frameBuffer.data(), 0);
+            frameBuffer.data(), &err);
+        if (err) {
+            fprintf(stderr, "Error creaing buffer: %d\n", err);
+        }
         std::fill(frameBuffer.begin(), frameBuffer.end(), 1.0f);
         testKernel.setArg(0, testBuffer());
         testKernel.setArg(1, width);

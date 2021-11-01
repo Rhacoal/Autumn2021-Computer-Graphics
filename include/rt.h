@@ -19,6 +19,15 @@ struct BVH {
 };
 
 class RayTracingScene {
+    BVH bvh;
+
+    // BVH buffer
+    size_t bvhNodeCount;
+    cl::Buffer bvhBuffer;
+
+    // primitives buffer
+    size_t triangleCount;
+    cl::Buffer triangleBuffer;
 public:
     void setFromScene(Scene &scene);
 };
@@ -52,9 +61,7 @@ class RayTracingRenderer {
     cl::Program program;
     cl::Kernel testKernel;
     cl::Kernel rayGenerationKernel;
-    cl::Kernel rayClosestHitKernel;
-    cl::Kernel missKernel;
-    cl::Kernel accumulateSamplesKernel;
+    cl::Kernel renderKernel;
 
     int _width{}, _height{};
     cl::Buffer rayBuffer;

@@ -52,6 +52,14 @@ inline float4 operator/(const float4 &lhs, float rhs) {
     return float4{lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs};
 }
 
+inline float4 operator+(const float4 &f4) {
+    return f4;
+}
+
+inline float4 operator-(const float4 &f4) {
+    return float4{-f4.x, -f4.y, -f4.z, -f4.w};
+}
+
 inline float length(const float3 &vec) {
     return std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
 }

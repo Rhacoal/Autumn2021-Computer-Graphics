@@ -180,7 +180,7 @@ public:
         if (use_ray_tracing) {
             rtRenderer->render(rtRendererScene, camera);
         } else {
-            renderer.render(currentScene(), camera);
+            // renderer.render(currentScene(), camera);
         }
         shaderPasses->renderEnd();
 

@@ -18,7 +18,7 @@ public:
         buffer_t buf;
         unsigned int itemSize;
         bool normalized;
-    } attrib;
+    } Attribute;
 
     Geometry() = default;
 
@@ -38,6 +38,14 @@ public:
         return attribs.find(name) != attribs.end();
     }
 
+    std::optional<const Attribute *> getAttribute(const std::string &name) const {
+        auto it = attribs.find(name);
+        if (it == attribs.end()) {
+            return {};
+        }
+        return std::make_optional(&it->second);
+    }
+
     bool removeAttribute(const std::string &name) {
         auto it = attribs.find(name);
         if (it == attribs.end()) return false;
@@ -52,7 +60,7 @@ public:
     }
 
     void addAttribute(const std::string &name, const float *array, size_t array_size, unsigned int itemSize) {
-        attribs.emplace(name, attrib{-1, buffer_t(array, array + array_size), itemSize, false});
+        attribs.emplace(name, Attribute{-1, buffer_t(array, array + array_size), itemSize, false});
         _invalidate_vbo();
     }
 
@@ -80,6 +88,10 @@ public:
         return indices.has_value();
     }
 
+    const std::optional<std::vector<unsigned int>> &getIndices() const noexcept {
+        return indices;
+    }
+
     void mergeGeometry(const Geometry &geo);
 
     void bindVAO(GLuint shaderProgram);
@@ -93,7 +105,7 @@ public:
 
     template<typename F>
     void traverseVertices(F &&func) {
-        auto it = attribs.find("origin");
+        auto it = attribs.find("position");
         if (it == attribs.end()) return;
         const auto &pos = it->second.buf;
         if (indices.has_value()) {
@@ -118,7 +130,7 @@ private:
     }
 
     GLuint vao{}, vbo{}, ebo{};
-    std::map<std::string, attrib> attribs;
+    std::map<std::string, Attribute> attribs;
     std::vector<GLuint> _used_positions;
     std::optional<std::vector<unsigned int>> indices;
     GLuint prev_shaderProgram = 0;

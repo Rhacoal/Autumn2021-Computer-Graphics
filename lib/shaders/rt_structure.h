@@ -8,10 +8,10 @@
 
 #endif
 
-struct RayTracingMaterial {
+typedef struct RayTracingMaterial {
     float4 color;
     float ior;
-};
+} RayTracingMaterial;
 
 typedef struct Vertex {
     float3 position;
@@ -25,7 +25,7 @@ typedef struct Light {
     float3 color;
     float intensity;
     float padding[3];
-};
+} Light;
 
 typedef struct Bounds3 {
     float3 pMin, pMax;
