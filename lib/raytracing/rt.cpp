@@ -74,6 +74,7 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
                 triangle.v1.normal = float3{buf[v1 * size + 0], buf[v1 * size + 1], buf[v1 * size + 2]};
                 triangle.v2.normal = float3{buf[v2 * size + 0], buf[v2 * size + 1], buf[v2 * size + 2]};
             }
+            triangles.emplace_back(triangle);
         };
         if (geometry->hasIndices()) {
             const auto indices = geometry->getIndices().value();
@@ -137,12 +138,12 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     int err;
     if (scene.bufferNeedUpdate || sceneBufferNeedUpdate) {
         // TODO actually fill in these buffers
-        textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 0, nullptr);
-        triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 0, nullptr);
-        materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, scene.materials.size() * sizeof(RayTracingMaterial),
-            scene.materials.data());
-        bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, scene.bvh.nodes.size() * sizeof(BVHNode),
-            scene.bvh.nodes.data());
+        textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
+        triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
+        materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
+        // scene.materials.size() * sizeof(RayTracingMaterial), scene.materials.data(), &err);
+        bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, scene.bvh.nodes.size() * sizeof(BVHNode),
+            scene.bvh.nodes.data(), &err);
         std::random_device r{};
         std::default_random_engine engine{r()};
 
@@ -267,7 +268,7 @@ bool cg::RayTracingRenderer::initCL() {
         }
         text << "Enter a number (1 ~ " << devices.size() << ')';
 
-//        device_index = 0;
+        device_index = 0;
         while (device_index == -1) {
             auto text_str = text.str();
             char *ret = tinyfd_inputBox("Select a OpenCL device", text_str.c_str(), "");
@@ -310,7 +311,7 @@ bool cg::RayTracingRenderer::init(int width, int height) {
 }
 
 bool cg::RayTracingRenderer::reloadShader() {
-    std::string source = readFile("lib/shaders/raytracing.cl");
+    std::string source = readFile("lib/shaders/raytracing.cpp");
     commandQueue.finish();
     sceneBufferNeedUpdate = true;
     program = cl::Program(context, source);
@@ -372,6 +373,7 @@ void cg::BVH::buildFromTriangles(std::vector<Triangle> &triangles) {
         nodes[ret].offset = recur(first + leftSize, last, baseIndex + leftSize);    // right
         return ret;
     };
+    recur(triangles.begin(), triangles.end(), 0u);
 }
 
 const char *trivialShaderVert = R"(

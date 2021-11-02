@@ -110,10 +110,10 @@ typedef struct Ray {
 typedef struct Intersection {
     float3 position;
     float3 barycentric;
-    // false if the ray is from outside or true if the ray is from inside
-    bool side;
     uint index;
     float distance;
+    // false if the ray is from outside or true if the ray is from inside
+    bool side;
 } Intersection;
 
 #endif //RT_STRUCTURE_H

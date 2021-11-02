@@ -41,6 +41,7 @@ bool intersect(Ray ray, Triangle triangle, Intersection *intersection) {
     intersection->barycentric.x = 1 - u - v;
     intersection->barycentric.y = u;
     intersection->barycentric.z = v;
+    intersection->distance = t;
     intersection->position = ray.origin + t * ray.direction;
     intersection->side = det < 0;
     return true;
@@ -57,10 +58,10 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
     float3 bounds[2] = {bounds3.pMin, bounds3.pMax};
     float tmin, tmax, tymin, tymax, tzmin, tzmax;
 
-    tmin = (bounds[ray.sign[0]].x - ray.origin.x) * inverseRay.x;
-    tmax = (bounds[1 - ray.sign[0]].x - ray.origin.x) * inverseRay.x;
-    tymin = (bounds[ray.sign[1]].y - ray.origin.y) * inverseRay.y;
-    tymax = (bounds[1 - ray.sign[1]].y - ray.origin.y) * inverseRay.y;
+    tmin = (bounds[1 - ray.sign[0]].x - ray.origin.x) * inverseRay.x;
+    tmax = (bounds[ray.sign[0]].x - ray.origin.x) * inverseRay.x;
+    tymin = (bounds[1 - ray.sign[1]].y - ray.origin.y) * inverseRay.y;
+    tymax = (bounds[ray.sign[1]].y - ray.origin.y) * inverseRay.y;
 
     if ((tmin > tymax) || (tymin > tmax))
         return false;
@@ -69,8 +70,8 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
     if (tymax < tmax)
         tmax = tymax;
 
-    tzmin = (bounds[ray.sign[2]].z - ray.origin.z) * inverseRay.z;
-    tzmax = (bounds[1 - ray.sign[2]].z - ray.origin.z) * inverseRay.z;
+    tzmin = (bounds[1 - ray.sign[2]].z - ray.origin.z) * inverseRay.z;
+    tzmax = (bounds[ray.sign[2]].z - ray.origin.z) * inverseRay.z;
 
     if ((tmin > tzmax) || (tzmin > tmax))
         return false;
@@ -97,25 +98,27 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
             if (intersect(ray, primitives[node.offset], &intersection)) {
                 if (intersection.distance < maxT) {
                     maxT = intersection.distance;
+                    intersection.index = node.offset;
                     *output = intersection;
                 }
                 hasIntersection = true;
             }
-        }
-        if (stackSize > 32) {
-            // too shallow, limit width
-            uint t[2] = {nodeIdx + 1, node.offset};
-            if (boundsRayIntersects(ray, bvh[t[ray.sign[node.dim]]].bounds)) {
-                stack[++stackSize] = t[ray.sign[node.dim]];
-            } else if (boundsRayIntersects(ray, bvh[t[1 - ray.sign[node.dim]]].bounds)) {
-                stack[++stackSize] = t[1 - ray.sign[node.dim]];
-            }
         } else {
-            if (boundsRayIntersects(ray, bvh[nodeIdx + 1].bounds)) {
-                stack[++stackSize] = nodeIdx + 1;
-            }
-            if (boundsRayIntersects(ray, bvh[node.offset].bounds)) {
-                stack[++stackSize] = node.offset;
+            if (stackSize > 32) {
+                // too shallow, limit width
+                uint t[2] = {nodeIdx + 1, node.offset};
+                if (boundsRayIntersects(ray, bvh[t[ray.sign[node.dim]]].bounds)) {
+                    stack[stackSize++] = t[ray.sign[node.dim]];
+                } else if (boundsRayIntersects(ray, bvh[t[1 - ray.sign[node.dim]]].bounds)) {
+                    stack[stackSize++] = t[1 - ray.sign[node.dim]];
+                }
+            } else {
+                if (boundsRayIntersects(ray, bvh[nodeIdx + 1].bounds)) {
+                    stack[stackSize++] = nodeIdx + 1;
+                }
+                if (boundsRayIntersects(ray, bvh[node.offset].bounds)) {
+                    stack[stackSize++] = node.offset;
+                }
             }
         }
     }
@@ -178,11 +181,11 @@ __kernel void render_kernel(
     int bcnt = 0;
     Intersection intersection;
     if (firstIntersection(ray, bvh, triangles, &intersection)) {
-        // iteratively select directions
+//         iteratively select directions
         for (int i = 0; i < bounces; ++i) {
             float3 wo = -ray.direction;
             float3 p = intersection.position;
-//            __global RayTracingMaterial *mtl = materials + triangles[intersection.index].mtlIndex;
+            __global RayTracingMaterial *mtl = materials + triangles[intersection.index].mtlIndex;
             bcnt += 1;
             stack[i].wo = wo;
             stack[i].p = p;
@@ -196,6 +199,10 @@ __kernel void render_kernel(
     for (int i = 0; i < bcnt; ++i) {
         color.x += 1.0f;
     }
+    if (bcnt) {
+        color = normalize(triangles[intersection.index].v0.normal * 0.5f + 0.5f);
+    }
+//    color = ray.direction * 0.5f + 0.5f;
 
 
     uint x = pixel_id % width;

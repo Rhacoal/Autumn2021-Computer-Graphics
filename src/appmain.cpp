@@ -118,7 +118,7 @@ public:
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
-        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 30, 20));
+        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(20.0f, 30, 20));
         currentScene().addChild(sphere);
 
         // axis helper
@@ -186,7 +186,7 @@ public:
         shaderPasses->renderBegin();
         if (use_ray_tracing) {
 //            rtRenderer->render(rtRendererScene, camera);
-            rtRenderer->renderCPU(rtRendererScene, camera);
+            rtRenderer->render(rtRendererScene, camera);
         } else {
             renderer.render(currentScene(), camera);
         }
