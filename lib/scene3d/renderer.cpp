@@ -56,10 +56,7 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
         const auto&[r_mat, r_geo, r_obj] = r;
         // draw same materials together
         return l_mat < r_mat;
-//        // draw transparent objects last
-//        if (l_mat->isTransparent() != r_mat->isTransparent()) {
-//            return r_mat->isTransparent();
-//        }
+        // TODO draw transparent objects last
     });
 
     // render objects in order
@@ -78,9 +75,9 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
         geo->bindVAO(sp);
 
         if (geo->hasIndices()) {
-            check_err(glDrawElements(GL_TRIANGLES, geo->elementCount(), GL_UNSIGNED_INT, nullptr));
+            check_err(glDrawElements(geo->glPrimitiveType(), geo->elementCount(), GL_UNSIGNED_INT, nullptr));
         } else {
-            check_err(glDrawArrays(GL_TRIANGLES, 0, geo->elementCount()));
+            check_err(glDrawArrays(geo->glPrimitiveType(), 0, geo->elementCount()));
         }
     }
     glUseProgram(0);

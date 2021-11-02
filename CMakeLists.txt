@@ -74,7 +74,24 @@ add_definitions(
         -DGL_SILENCE_DEPRECATION
 )
 
-add_executable(assignment lib/scene3d/object3d.cpp lib/mesh/mesh.cpp lib/application.cpp lib/mesh/geometry.cpp lib/stb_image_impl.cpp lib/mesh/material.cpp lib/scene3d/renderer.cpp lib/util/shader.cpp src/appmain.cpp lib/util/texture.cpp lib/importer/obj_loader.cpp lib/raytracing/rt.cpp lib/raytracing/rt_program.cpp lib/shaders/raytracing.cl lib/raytracing/simcl.cpp)
+add_executable(assignment
+        lib/application.cpp
+        lib/helper/axis_helper.cpp
+        lib/importer/obj_loader.cpp
+        lib/mesh/geometry.cpp
+        lib/mesh/material.cpp
+        lib/mesh/mesh.cpp
+        lib/raytracing/rt.cpp
+        lib/raytracing/rt_program.cpp
+        lib/raytracing/simcl.cpp
+        lib/scene3d/object3d.cpp
+        lib/scene3d/renderer.cpp
+        lib/shaders/raytracing.cpp
+        lib/stb_image_impl.cpp
+        lib/util/shader.cpp
+        lib/util/texture.cpp
+        src/appmain.cpp
+        )
 target_link_libraries(assignment
         ${ALL_LIBS}
         )

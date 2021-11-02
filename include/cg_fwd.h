@@ -34,7 +34,9 @@ class SkyboxMaterial;
 
 class StandardMaterial;
 
-class Geometry;
+class BaseGeometry;
+
+class MeshGeometry;
 
 class BoxGeometry;
 

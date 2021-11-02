@@ -207,6 +207,9 @@ public:
 
     virtual cg::Camera *isCamera() { return nullptr; }
 
+    // to exclude object from ray tracing scene
+    virtual bool isBackground() const { return false; }
+
     /**
      * Submits draw calls to render.
      */

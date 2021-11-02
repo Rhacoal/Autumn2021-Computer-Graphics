@@ -48,19 +48,19 @@ cg::Object3D *cg::loadObj(const char *path) {
         return nullptr;
     }
 
-    std::map<unsigned int, std::shared_ptr<Geometry>> geometries;
+    std::map<unsigned int, std::shared_ptr<MeshGeometry>> geometries;
     std::map<unsigned int, std::shared_ptr<Material>> mats;
     auto *root = new Object3D;
     std::vector<float> vertices;
     const auto convert_mesh = [&](unsigned int meshIdx) -> Mesh * {
         aiMesh *mesh = scene->mMeshes[meshIdx];
         // geometry
-        std::shared_ptr<Geometry> geo;
+        std::shared_ptr<MeshGeometry> geo;
         const auto it_geo = geometries.find(meshIdx);
         if (it_geo != geometries.end()) {
             geo = it_geo->second;
         } else {
-            geo = std::make_shared<Geometry>();
+            geo = std::make_shared<MeshGeometry>();
             if (!mesh->HasPositions() || !mesh->HasFaces()) {
                 return nullptr;
             }
@@ -166,7 +166,7 @@ Mesh *toBox(nlohmann::json &obj) {
     auto *material = new PhongMaterial();
     auto *geometry = new BoxGeometry(size[0], size[1], size[2]);
 
-    Mesh *mesh = new Mesh(std::shared_ptr<Material>(material), std::shared_ptr<Geometry>(geometry));
+    Mesh *mesh = new Mesh(std::shared_ptr<Material>(material), std::shared_ptr<MeshGeometry>(geometry));
     material->color = glm::vec4{color[0], color[1], color[2], 1.0f};
     if (obj.contains("shininess")) {
         material->shininess = obj["shininess"];

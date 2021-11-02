@@ -41,11 +41,11 @@ struct ProgramArguments {
 };
 
 class Renderer {
-    std::vector<std::tuple<Material *, Geometry *, Object3D *>> draw_calls;
+    std::vector<std::tuple<Material *, BaseGeometry *, Object3D *>> draw_calls;
 public:
     void render(Scene &sc, Camera &cam);
 
-    void draw(Material *mat, Geometry *geo, Object3D *obj) {
+    void draw(Material *mat, BaseGeometry *geo, Object3D *obj) {
         draw_calls.emplace_back(mat, geo, obj);
     }
 };

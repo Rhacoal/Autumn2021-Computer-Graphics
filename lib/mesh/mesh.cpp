@@ -24,7 +24,6 @@ cg::BoundingBox cg::Mesh::computeBoundingBox() const {
 cg::Skybox::Skybox(const char **faces) : _mat(std::make_shared<cg::SkyboxMaterial>()),
                                          _geo(std::make_shared<cg::BoxGeometry>(2.0f, 2.0f, 2.0f, Side::BackSide)) {
     _mat->skybox = CubeTexture::load(faces);
-//    _mat->color = glm::vec4(0.0, 0.0, 0.4, 1.0);
 }
 
 void cg::Skybox::render(cg::Renderer &re, cg::Scene &sc, cg::Camera &ca) {

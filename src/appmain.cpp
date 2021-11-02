@@ -8,6 +8,8 @@
 #include <obj_loader.h>
 #include <rt.h>
 
+#include <helper/axis_helper.h>
+
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -111,13 +113,16 @@ public:
         currentScene().addChild(dirLight);
 
         // camera
-        camera.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+        camera.setPosition(glm::vec3(5.0f, 1.0f, 5.0f));
         camera.lookAt(glm::vec3(-1.0f, 0.0f, -1.0f));
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
         auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 30, 20));
         currentScene().addChild(sphere);
+
+        // axis helper
+        currentScene().addChild(new AxisHelper({1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 5));
 
         // control
         glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -173,14 +178,15 @@ public:
         }
 
         shaderPasses->usePasses({
-                                    {use_invert, &invert.value()},
-                                    {use_gray,   &gray.value()},
-                                    {use_gamma,  &gammaCorrection.value()},
-                                });
+            {use_invert, &invert.value()},
+            {use_gray,   &gray.value()},
+            {use_gamma,  &gammaCorrection.value()},
+        });
 
         shaderPasses->renderBegin();
         if (use_ray_tracing) {
-            rtRenderer->render(rtRendererScene, camera);
+//            rtRenderer->render(rtRendererScene, camera);
+            rtRenderer->renderCPU(rtRendererScene, camera);
         } else {
             renderer.render(currentScene(), camera);
         }
@@ -194,7 +200,7 @@ public:
             static int counter = 0;
             static float clear_color[3]{};
 
-            ImGui::Begin("Assignment 2");
+            ImGui::Begin("Assignment 3");
             if (ImGui::Button("load scene...")) {
                 static constexpr const char *filter[] = {"*.json"};
                 const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
@@ -223,11 +229,35 @@ public:
                     if (!rtRenderer.has_value()) {
                         rtRenderer.emplace();
                     }
-                    rtRenderer->init(640, 480);
+                    rtRenderer->init(160, 90);
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
                     use_ray_tracing = true;
                 }
+            }
+
+            if (ImGui::Button("reload shader")) {
+                if (rtRenderer.has_value()) {
+                    rtRenderer.value().reloadShader();
+                }
+            }
+
+            if (ImGui::Button("debug")) {
+                float pixel_x = 0.0f;
+                float pixel_y = 0.0f;
+                float near = camera.near();
+                float fov = camera.fov() / 180.f * math::pi<float>();
+                float ndc_x = (pixel_x / windowWidth()) * 2.0f - 1.0f;
+                float ndc_y = (pixel_y / windowHeight()) * 2.0f - 1.0f;
+                float aspect = (float) windowWidth() / (float) windowHeight();
+                float top = near * tan(fov / 2);
+                auto near_pos = glm::vec3{ndc_x * top * aspect, ndc_y * top, -near};
+                auto cameraX = glm::cross(camera.lookDir(), camera.up());
+                auto cameraY = glm::cross(cameraX, camera.lookDir());
+                auto cameraZ = -camera.lookDir();
+                auto world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * cameraZ + camera.position();
+                currentScene().addChild(
+                    new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.05f)));
             }
 
             ImGui::Text("filters");
@@ -241,10 +271,10 @@ public:
 
             ImGui::Text("mouse: (%.2f, %.2f)", lastMouseX, lastMouseY);
             ImGui::Text("average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                        ImGui::GetIO().Framerate);
+                ImGui::GetIO().Framerate);
             ImGui::Text("camera: pos(%.2f, %.2f, %.2f) dir(%.2f, %.2f, %.2f)",
-                        camera.position().x, camera.position().y, camera.position().z,
-                        camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
+                camera.position().x, camera.position().y, camera.position().z,
+                camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
             ImGui::End();
         }
         ImGui::Render();

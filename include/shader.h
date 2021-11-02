@@ -13,7 +13,7 @@ class Shader {
 public:
     GLuint id;
 
-    Shader();
+    Shader() noexcept;
 
     /**
      * Constructs a shader object using shader source.
@@ -29,6 +29,10 @@ public:
     Shader &operator=(Shader &&shader) noexcept;
 
     void use() const;
+
+    bool isNull() const noexcept {
+        return id == 0;
+    }
 
     void setUniform4f(const char *name, const glm::vec4 &value) {
         glUniform4fv(glGetUniformLocation(id, name), 1, &value[0]);

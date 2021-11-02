@@ -11,14 +11,14 @@
 namespace cg {
 class Mesh : public Object3D {
     std::shared_ptr<Material> _mat;
-    std::shared_ptr<Geometry> _geo;
+    std::shared_ptr<MeshGeometry> _geo;
 public:
-    Mesh(std::shared_ptr<Material> material, std::shared_ptr<Geometry> geometry)
+    Mesh(std::shared_ptr<Material> material, std::shared_ptr<MeshGeometry> geometry)
         : _geo(std::move(geometry)), _mat(std::move(material)) {}
 
     cg::Mesh *isMesh() override { return this; }
 
-    Geometry *geometry() {
+    MeshGeometry *geometry() {
         return _geo.get();
     }
 
@@ -47,7 +47,7 @@ public:
 class InstancedMesh : public Mesh {
     int count;
 public:
-    InstancedMesh(int count, std::shared_ptr<Material> material, std::shared_ptr<Geometry> geometry)
+    InstancedMesh(int count, std::shared_ptr<Material> material, std::shared_ptr<MeshGeometry> geometry)
         : count(count), Mesh(std::move(material), std::move(geometry)) {}
 };
 }

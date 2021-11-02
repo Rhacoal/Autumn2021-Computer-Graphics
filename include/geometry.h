@@ -9,20 +9,27 @@
 #include <map>
 
 namespace cg {
-class Geometry {
+/**
+ * BaseGeometry is a wrapper for vertex array objects.
+ *
+ * For specific primitives, see:
+ * class Geometry for triangle primitives
+ */
+class BaseGeometry {
 public:
-    static constexpr GLenum gl_draw_type = GL_TRIANGLES;
     typedef std::vector<float> buffer_t;
     typedef struct {
-        int layout_index;
+        int layoutIndex;
         buffer_t buf;
         unsigned int itemSize;
         bool normalized;
     } Attribute;
 
-    Geometry() = default;
+    BaseGeometry() = default;
 
-    ~Geometry() {
+    BaseGeometry(const BaseGeometry &) = delete;
+
+    ~BaseGeometry() {
         if (inited) {
             glDeleteVertexArrays(1, &vao);
             glDeleteBuffers(1, &vbo);
@@ -30,9 +37,9 @@ public:
         }
     }
 
-    Geometry(const Geometry &) = delete;
+    BaseGeometry(BaseGeometry &&) noexcept;
 
-    Geometry(Geometry &&) noexcept;
+    virtual GLenum glPrimitiveType() const noexcept = 0;
 
     bool hasAttribute(const std::string &name) const {
         return attribs.find(name) != attribs.end();
@@ -54,9 +61,9 @@ public:
         return true;
     }
 
-    template<size_t N>
-    void addAttribute(const std::string &name, const float (&array)[N], unsigned int itemSize) {
-        addAttribute(name, array, N, itemSize);
+    template<typename ContainerType>
+    void addAttribute(const std::string &name, ContainerType &&container, unsigned int itemSize) {
+        addAttribute(name, std::data(container), std::size(container), itemSize);
     }
 
     void addAttribute(const std::string &name, const float *array, size_t array_size, unsigned int itemSize) {
@@ -64,9 +71,9 @@ public:
         _invalidate_vbo();
     }
 
-    template<size_t N>
-    void addIndices(const unsigned int (&array)[N]) {
-        addIndices(array, N);
+    template<typename ContainerType>
+    void addIndices(const std::string &name, ContainerType &&container) {
+        addIndices(name, std::data(container), std::size(container));
     }
 
     void addIndices(const unsigned int *array, size_t arrayLength) {
@@ -92,9 +99,9 @@ public:
         return indices;
     }
 
-    void mergeGeometry(const Geometry &geo);
+    void mergeGeometry(const BaseGeometry &geo);
 
-    void bindVAO(GLuint shaderProgram);
+    virtual void bindVAO(GLuint shaderProgram);
 
     GLsizei elementCount() const {
         if (indices.has_value()) {
@@ -103,23 +110,7 @@ public:
         return count;
     }
 
-    template<typename F>
-    void traverseVertices(F &&func) {
-        auto it = attribs.find("position");
-        if (it == attribs.end()) return;
-        const auto &pos = it->second.buf;
-        if (indices.has_value()) {
-            for (unsigned int pi : *indices) {
-                func(pos[pi * 3], pos[pi * 3 + 1], pos[pi * 3 + 2]);
-            }
-        } else {
-            for (unsigned int i = 0; i + 2 < pos.size(); i += 3) {
-                func(pos[i], pos[i + 1], pos[i + 2]);
-            }
-        }
-    }
-
-private:
+protected:
     void _invalidate_vbo() {
         _need_update = true;
         _need_re_layout = true;
@@ -141,18 +132,43 @@ private:
     GLsizei count = 0;
 };
 
+class MeshGeometry : public BaseGeometry {
+public:
+    GLenum glPrimitiveType() const noexcept override {
+        return GL_TRIANGLES;
+    }
+
+    MeshGeometry() = default;
+
+    template<typename F>
+    void traverseVertices(F &&func) {
+        auto it = attribs.find("position");
+        if (it == attribs.end()) return;
+        const auto &pos = it->second.buf;
+        if (indices.has_value()) {
+            for (unsigned int pi : *indices) {
+                func(pos[pi * 3], pos[pi * 3 + 1], pos[pi * 3 + 2]);
+            }
+        } else {
+            for (unsigned int i = 0; i + 2 < pos.size(); i += 3) {
+                func(pos[i], pos[i + 1], pos[i + 2]);
+            }
+        }
+    }
+};
+
 enum class Side {
     FrontSide, BackSide, DoubleSide
 };
 
-class BoxGeometry : public Geometry {
+class BoxGeometry : public MeshGeometry {
 public:
     BoxGeometry(float sizeX, float sizeY, float sizeZ, Side side = Side::FrontSide);
 };
 
-class SphereGeometry : public Geometry {
+class SphereGeometry : public MeshGeometry {
 public:
-    SphereGeometry(float radius, int widthSegments, int heightSegments);
+    SphereGeometry(float radius, int widthSegments = 20, int heightSegments = 20);
 };
 }
 

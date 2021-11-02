@@ -12,7 +12,7 @@ std::string readFile(const char *path) {
     return ret;
 }
 
-cg::Shader::Shader() : id(0) {}
+cg::Shader::Shader() noexcept: id(0) {}
 
 std::string getShaderSource(GLuint shader) {
     constexpr size_t buf_size = 1u << 20u;

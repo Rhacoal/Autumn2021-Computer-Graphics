@@ -4,6 +4,7 @@
 #include <geometry.h>
 #include <material.h>
 #include <mesh.h>
+#include "lib/shaders/rt_definition.h"
 
 #include <cl.hpp>
 #include <tinyfiledialogs.h>
@@ -23,11 +24,11 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     std::map<Material *, uint32_t> mtlMap;
     scene.traverse([&](Object3D &object) {
         Mesh *mesh = object.isMesh();
-        if (!mesh) return;
-        Geometry *geometry = mesh->geometry();
+        if (!mesh || mesh->isBackground()) return;
+        MeshGeometry *geometry = mesh->geometry();
         Material *mtl = mesh->material();
         auto bufInfo = [](
-            const std::optional<const Geometry::Attribute *> &buf) -> std::optional<std::pair<const Geometry::buffer_t, unsigned int>> {
+            const std::optional<const MeshGeometry::Attribute *> &buf) -> std::optional<std::pair<const MeshGeometry::buffer_t, unsigned int>> {
             if (buf.has_value()) {
                 return std::make_optional(std::make_pair(buf.value()->buf, buf.value()->itemSize));
             }
@@ -89,30 +90,69 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     bvh.buildFromTriangles(triangles);
 }
 
+struct CPUDispatcher {
+    int cores = 1;
+
+    template<typename Func, typename...Args>
+    void dispatch(uint size, Func &&func, Args &&...args) {
+        if (cores == 1) {
+            for (uint i = 0; i < size; ++i) {
+                set_global_id(0, i);
+                func(std::forward<Args &&>(args)...);
+            }
+        }
+    }
+};
+
+void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &camera) {
+    // no need to init cl first
+    auto textureMemBuffer = nullptr;
+    auto triangleMemBuffer = scene.triangles.data();
+    auto materialMemBuffer = scene.materials.data();
+    auto bvhMemBuffer = scene.bvh.nodes.data();
+    rayMemBuffer.resize(_width * _height);
+    CPUDispatcher dispatcher{.cores = 1};
+//    __global Ray *output,
+//    uint width, uint height, ulong globalSeed,
+//        float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
+    PerspectiveCamera *perspectiveCamera = camera.isPerspectiveCamera();
+    dispatcher.dispatch(_width * _height, raygeneration_kernel,
+        rayMemBuffer.data(), _width, _height, 1,
+        toFloat3(camera.position()), toFloat3(camera.lookDir()), toFloat3(camera.up()),
+        perspectiveCamera->fov() / 180.f * math::pi<float>(), perspectiveCamera->near());
+//    __global float4 *output, uint width, uint height,
+//        __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
+//        __global Ray *rays, uint bounces,
+//        ulong globalSeed, uint spp
+    dispatcher.dispatch(_width * _height, render_kernel,
+        reinterpret_cast<float4*>(frameBuffer.data()), _width, _height,
+        bvhMemBuffer, triangleMemBuffer, materialMemBuffer,
+        rayMemBuffer.data(), 1, 1, 1
+    );
+    drawFrameBuffer();
+}
+
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // update buffers (if needed)
-    if (scene.bufferNeedUpdate) {
+    int err;
+    if (scene.bufferNeedUpdate || sceneBufferNeedUpdate) {
         // TODO actually fill in these buffers
         textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 0, nullptr);
         triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 0, nullptr);
         materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, scene.materials.size() * sizeof(RayTracingMaterial),
-                                    scene.materials.data());
+            scene.materials.data());
         bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, scene.bvh.nodes.size() * sizeof(BVHNode),
-                               scene.bvh.nodes.data());
+            scene.bvh.nodes.data());
         std::random_device r{};
         std::default_random_engine engine{r()};
 
         // __global Ray *output,
-        rayGenerationKernel.setArg(0, outputBuffer());
+        rayGenerationKernel.setArg(0, rayBuffer());
         // uint width, uint height,
         rayGenerationKernel.setArg(1, _width);
         rayGenerationKernel.setArg(2, _height);
         // ulong globalSeed,
         rayGenerationKernel.setArg(3, std::uniform_int_distribution<ulong>{}(engine));
-        // float3 cameraPosition, float3 cameraDir, float3 cameraUp,
-        rayGenerationKernel.setArg(4, toFloat3(camera.position()));
-        rayGenerationKernel.setArg(5, toFloat3(camera.lookDir()));
-        rayGenerationKernel.setArg(6, toFloat3(camera.up()));
 
         // __global float4 *output, uint width, uint height,
         renderKernel.setArg(0, outputBuffer());
@@ -130,27 +170,41 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         renderKernel.setArg(9, (uint) 1);
 
         scene.bufferNeedUpdate = false;
+        sceneBufferNeedUpdate = false;
+
+        printf("Scene inited for RT");
     }
     // update camera
     auto perspective = camera.isPerspectiveCamera();
     if (!perspective) {
         throw std::runtime_error("Only perspective camera can be used for path tracing.");
     }
+    // float3 cameraPosition, float3 cameraDir, float3 cameraUp,
+    rayGenerationKernel.setArg(4, toFloat3(camera.position()));
+    rayGenerationKernel.setArg(5, toFloat3(camera.lookDir()));
+    rayGenerationKernel.setArg(6, toFloat3(camera.up()));
     // float fov, float near
-    rayGenerationKernel.setArg(7, perspective->fov());
+    rayGenerationKernel.setArg(7, (perspective->fov() / 180.f * math::pi<float>()));
     rayGenerationKernel.setArg(8, perspective->near());
 
     // ray tracing
-    std::vector<cl::Event> rayGenEvent;
-    commandQueue.enqueueNDRangeKernel(rayGenerationKernel, cl::NullRange, _width * _height, cl::NullRange,
-                                      nullptr, rayGenEvent.data());
+    std::vector<cl::Event> rayGenEvent(1);
+    err = commandQueue.enqueueNDRangeKernel(
+        rayGenerationKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr, rayGenEvent.data()
+    );
     std::vector<cl::Event> raytracingEvent(1);
-    commandQueue.enqueueNDRangeKernel(rayGenerationKernel, cl::NullRange, _width * _height, cl::NullRange,
-                                      &rayGenEvent, raytracingEvent.data());
-    commandQueue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &raytracingEvent,
-                                   nullptr);
+    err = commandQueue.enqueueNDRangeKernel(
+        renderKernel, cl::NullRange, _width * _height, cl::NullRange, &rayGenEvent, raytracingEvent.data()
+    );
+    err = commandQueue.enqueueReadBuffer(
+        outputBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &raytracingEvent, nullptr
+    );
     commandQueue.finish();
     // draw to screen
+    drawFrameBuffer();
+}
+
+void cg::RayTracingRenderer::drawFrameBuffer() {
     texture.setData(_width, _height, GL_RGB, GL_RGBA, GL_FLOAT, frameBuffer.data());
     if (!trivialShader.has_value()) {
         trivialShader.emplace();
@@ -167,7 +221,7 @@ bool cg::RayTracingRenderer::initCL() {
     // Get all available OpenCL platforms (e.g. AMD OpenCL, Nvidia CUDA, Intel OpenCL)
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
-    const const char *endl = "\\r\\n";
+    const char *endl = "\\r\\n";
     int platform_index = -1;
     {
         std::stringstream text;
@@ -237,19 +291,9 @@ bool cg::RayTracingRenderer::initCL() {
 bool cg::RayTracingRenderer::init(int width, int height) {
     initCL();
     if (!programInited) {
-        std::string source = readFile("lib/shaders/raytracing.cl");
-        program = cl::Program(context, source);
-        cl_int result = program.build({device});
-        if (result) {
-            fprintf(stderr, "error during compilation (%d):\n", result);
-        }
-        if (result == CL_BUILD_PROGRAM_FAILURE) {
-            auto buildLog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
-            puts(buildLog.c_str());
+        if (!reloadShader()) {
             return false;
         }
-        rayGenerationKernel = cl::Kernel(program, "raygeneration_kernel");
-        renderKernel = cl::Kernel(program, "render_kernel");
         programInited = true;
     }
     if (width != _width || height != _height) {
@@ -259,10 +303,28 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         frameBuffer.resize(_width * _height * 4);
         std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
 
-        int err;
-        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr, &err);
-        if (err) { fprintf(stderr, "Error creaing buffer: %d\n", err); }
+        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr);
+        outputBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr);
     }
+    return true;
+}
+
+bool cg::RayTracingRenderer::reloadShader() {
+    std::string source = readFile("lib/shaders/raytracing.cl");
+    commandQueue.finish();
+    sceneBufferNeedUpdate = true;
+    program = cl::Program(context, source);
+    cl_int result = program.build({device});
+    if (result) {
+        fprintf(stderr, "error during compilation (%d):\n", result);
+    }
+    if (result == CL_BUILD_PROGRAM_FAILURE) {
+        auto buildLog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
+        puts(buildLog.c_str());
+        return false;
+    }
+    rayGenerationKernel = cl::Kernel(program, "raygeneration_kernel");
+    renderKernel = cl::Kernel(program, "render_kernel");
     return true;
 }
 

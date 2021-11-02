@@ -55,13 +55,14 @@ class RayTracingRenderer {
     bool initCL();
 
     bool programInited = false;
+    bool sceneBufferNeedUpdate = true;
 
     cl::Program program;
     cl::Kernel testKernel;
     cl::Kernel rayGenerationKernel;
     cl::Kernel renderKernel;
 
-    int _width{}, _height{};
+    uint _width{}, _height{};
     cl::Buffer rayBuffer;
     cl::Buffer outputBuffer;
 
@@ -72,16 +73,25 @@ class RayTracingRenderer {
     cl::Buffer bvhBuffer;
     cl::Buffer lightBuffer;
 
+    // cpu related buffers
+    std::vector<Ray> rayMemBuffer;
+
     std::vector<float> frameBuffer;
 
     size_t frameBufferSize() const {
         return frameBuffer.size() * sizeof(float);
     }
 
+    void drawFrameBuffer();
+
 public:
     bool init(int width, int height);
 
+    bool reloadShader();
+
     void render(RayTracingScene &scene, Camera &camera);
+
+    void renderCPU(RayTracingScene &scene, Camera &camera);
 };
 }
 

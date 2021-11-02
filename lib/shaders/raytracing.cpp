@@ -1,9 +1,5 @@
 #include "lib/shaders/rt_structure.h"
 
-int next(ulong *, int);
-
-float randomFloat(ulong *);
-
 int next(ulong *seed, int bits) {
     *seed = (*seed * 0x5DEECE66DL + 0xBL) & (((ulong) 1ul << 48) - 1);
     return (int) (*seed >> (48 - bits));
@@ -12,21 +8,6 @@ int next(ulong *seed, int bits) {
 float randomFloat(ulong *seed) {
     return (float) next(seed, 24) / (float) (1 << 24);
 }
-
-typedef struct Intersection {
-    float3 position;
-    float3 barycentric;
-    // false if the ray is from outside or true if the ray is from inside
-    bool side;
-    uint index;
-    float distance;
-} Intersection;
-
-bool intersect(Ray, Triangle, Intersection *);
-
-bool boundsRayIntersects(Ray, Bounds3);
-
-bool firstIntersection(Ray, __global BVHNode *, __global Triangle *, Intersection *);
 
 /**
  * Checks if a ray intersects with a triangle.
@@ -147,13 +128,14 @@ __kernel void raygeneration_kernel(
     float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
     const int pixel_id = get_global_id(0);
-    ulong seed = pixel_id ^ globalSeed;
+    ulong seed = pixel_id ^globalSeed;
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
     float ndc_x = (pixel_x / width) * 2.0f - 1.0f;
     float ndc_y = (pixel_y / height) * 2.0f - 1.0f;
     float aspect = (float) height / (float) width;
-    float top = 1.0f / (near * tan(fov));
+    float top = near * tan(fov / 2);
+//    float top = 1.0f / (near * tan(fov));
 #ifdef __cplusplus
     float3 near_pos = float3{ndc_x * top * aspect, ndc_y * top, -near};
 #else
@@ -161,7 +143,7 @@ __kernel void raygeneration_kernel(
 #endif
     float3 cameraX = cross(cameraDir, cameraUp);
     float3 cameraY = cross(cameraX, cameraDir);
-    float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * (-cameraDir);
+    float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * (-cameraDir) + cameraPosition;
 
     Ray ray;
     ray.origin = cameraPosition;
@@ -169,16 +151,13 @@ __kernel void raygeneration_kernel(
     ray.sign[0] = ray.direction.x > 0;
     ray.sign[1] = ray.direction.y > 0;
     ray.sign[2] = ray.direction.z > 0;
+    output[pixel_id] = ray;
 }
 
 __kernel void render_kernel(
-    // output image
     __global float4 *output, uint width, uint height,
-    // primitives and materials
     __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
-    // path tracing
     __global Ray *rays, uint bounces,
-    // sampling
     ulong globalSeed, uint spp
 ) {
     const int pixel_id = get_global_id(0);
@@ -188,14 +167,14 @@ __kernel void render_kernel(
 #else
     float3 color = (float3) (0.0f);
 #endif
-
+//
     // a maximum of 15 bounces is allowed
     struct {
-        int mltIndex;
+        uint mtlIndex;
         uint primtiveIndex;
         float3 wo;
         float3 p;
-    } stack[16][2];
+    } stack[16];
     int bcnt = 0;
     Intersection intersection;
     if (firstIntersection(ray, bvh, triangles, &intersection)) {
@@ -214,20 +193,22 @@ __kernel void render_kernel(
         // TODO draw sky
     }
 
-    for (int i = 0; i < bct; ++i) {
-        color.r += 1.0f;
+    for (int i = 0; i < bcnt; ++i) {
+        color.x += 1.0f;
     }
+
 
     uint x = pixel_id % width;
     uint y = pixel_id / width;
     float fx = (float) x / (float) width;
     float fy = (float) y / (float) height;
+//    color = (ray.direction + 1.0f) / 2.0f;
+
     output[pixel_id] =
 #ifdef __cplusplus
         float4{color.x / spp, color.y / spp, color.z / spp, 1.0f};
 #else
     (float4)(color / spp, 1.0);
-    (float4)(fx, fy, 0, 1.0);
 #endif
 }
 

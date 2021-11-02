@@ -16,6 +16,8 @@ typedef uint16_t ushort;
 #define __global
 #define __kernel
 
+void set_global_id(uint dimindx, uint value);
+
 int get_global_id(uint dimindx);
 
 inline float4 min(const float4 &a, const float4 &b) {
@@ -32,6 +34,14 @@ inline float4 operator-(const float4 &lhs, const float4 &rhs) {
 
 inline float4 operator+(const float4 &lhs, const float4 &rhs) {
     return float4{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w};
+}
+
+inline float4 operator+(const float4 &lhs, float rhs) {
+    return float4{lhs.x + rhs, lhs.y + rhs, lhs.z + rhs, lhs.w + rhs};
+}
+
+inline float4 operator+(float lhs, const float4 &rhs) {
+    return float4{lhs + rhs.x, lhs + rhs.y, lhs + rhs.z, lhs + rhs.w};
 }
 
 inline float4 operator*(const float4 &lhs, const float4 &rhs) {
@@ -67,7 +77,7 @@ inline float4 toFloat4(const glm::vec4 &vec) {
 }
 
 inline float3 toFloat3(const glm::vec3 &vec) {
-    return float3{vec.x, vec.y, vec.z};
+    return float3{vec.x, vec.y, vec.z, 1.0f};
 }
 
 inline float length(const float3 &vec) {
