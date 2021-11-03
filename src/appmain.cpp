@@ -190,8 +190,8 @@ public:
 
         shaderPasses->renderBegin();
         if (use_ray_tracing) {
-//            rtRenderer->render(rtRendererScene, camera);
-            rtRenderer->renderCPU(rtRendererScene, camera);
+            rtRenderer->render(rtRendererScene, camera);
+//            rtRenderer->renderCPU(rtRendererScene, camera);
         } else {
             renderer.render(currentScene(), camera);
         }

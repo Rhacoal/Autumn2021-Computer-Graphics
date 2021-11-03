@@ -97,6 +97,13 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             }
         }
     });
+    // prevent empty buffers
+    if (triangles.empty()) {
+        triangles.emplace_back();
+    }
+    if (materials.empty()) {
+        materials.emplace_back();
+    }
     bvh.buildFromTriangles(triangles);
 }
 
@@ -113,8 +120,9 @@ struct CPUDispatcher {
         } else {
             std::vector<std::thread> threads;
             for (int i = 0; i < cores; ++i) {
+                int coreId = i;
                 threads.emplace_back([&]() {
-                    for (uint t = i; t < size; t += cores) {
+                    for (uint t = coreId; t < size; t += cores) {
                         set_global_id(0, t);
                         func(std::forward<Args &&>(args)...);
                     }
@@ -129,7 +137,8 @@ struct CPUDispatcher {
 
 void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &camera) {
     // no need to init cl first
-    auto textureMemBuffer = nullptr;
+    // TODO init texture buffer
+//    auto textureMemBuffer = nullptr;
     auto triangleMemBuffer = scene.triangles.data();
     auto materialMemBuffer = scene.materials.data();
     auto bvhMemBuffer = scene.bvh.nodes.data();
@@ -149,8 +158,6 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
 //        float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
     PerspectiveCamera *perspectiveCamera = camera.isPerspectiveCamera();
 
-    std::random_device r{};
-    std::default_random_engine engine{r()};
     dispatcher.dispatch(_width * _height, raygeneration_kernel,
         rayMemBuffer.data(), _width, _height, std::uniform_int_distribution<ulong>()(engine),
         toFloat3(camera.position()), toFloat3(camera.lookDir()), toFloat3(camera.up()),
@@ -165,7 +172,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
         rayMemBuffer.data(), 2,
         std::uniform_int_distribution<ulong>()(engine), 1
     );
-    CPUDispatcher{.cores = 16}.dispatch(_width * _height * 4, [&]() {
+    CPUDispatcher{.cores = 1}.dispatch(_width * _height * 4, [&]() {
         uint id = get_global_id(0);
         frameBuffer[id] = accumulateFrameBuffer[id] / samples;
     });
@@ -177,15 +184,14 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     int err;
     if (scene.bufferNeedUpdate || sceneBufferNeedUpdate) {
         // TODO actually fill in these buffers
-        textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
-        triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
-        materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
+//        textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
+        triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            scene.triangles.size() * sizeof(Triangle), scene.triangles.data(), &err);
+        materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            scene.materials.size() * sizeof(RayTracingScene), scene.materials.data(), &err);
         // scene.materials.size() * sizeof(RayTracingMaterial), scene.materials.data(), &err);
         bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-            scene.bvh.nodes.size() * sizeof(BVHNode),
-            scene.bvh.nodes.data(), &err);
-        std::random_device r{};
-        std::default_random_engine engine{r()};
+            scene.bvh.nodes.size() * sizeof(BVHNode), scene.bvh.nodes.data(), &err);
 
         // __global Ray *output,
         rayGenerationKernel.setArg(0, rayBuffer());
@@ -196,7 +202,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         rayGenerationKernel.setArg(3, std::uniform_int_distribution<ulong>{}(engine));
 
         // __global float4 *output, uint width, uint height,
-        renderKernel.setArg(0, outputBuffer());
+        renderKernel.setArg(0, accumulateBuffer());
         renderKernel.setArg(1, _width);
         renderKernel.setArg(2, _height);
         // __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
@@ -205,10 +211,21 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         renderKernel.setArg(5, materialBuffer());
         // __global Ray *rays, uint bounces,
         renderKernel.setArg(6, rayBuffer());
-        renderKernel.setArg(7, (uint) 1);
+        renderKernel.setArg(7, (uint) bounces);
         // ulong globalSeed, uint spp
         renderKernel.setArg(8, std::uniform_int_distribution<ulong>{}(engine));
         renderKernel.setArg(9, (uint) 1);
+
+        // __global float4 *output, uint width, uint height
+        clearKernel.setArg(0, accumulateBuffer);
+        clearKernel.setArg(1, _width);
+        clearKernel.setArg(2, _width);
+
+        // __global float4 *input, uint width, uint height, uint spp, __global float4 *output
+        accumulateKernel.setArg(0, accumulateBuffer);
+        accumulateKernel.setArg(1, _width);
+        accumulateKernel.setArg(2, _height);
+        accumulateKernel.setArg(4, outputBuffer);
 
         scene.bufferNeedUpdate = false;
         sceneBufferNeedUpdate = false;
@@ -220,25 +237,52 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     if (!perspective) {
         throw std::runtime_error("Only perspective camera can be used for path tracing.");
     }
+    // resample
+    bool needClear = false;
+    if (camera.up() != up || camera.lookDir() != dir || camera.position() != pos) {
+        needClear = true;
+        up = camera.up();
+        dir = camera.lookDir();
+        pos = camera.position();
+        samples = 0;
+    }
+    samples += 1;
     // float3 cameraPosition, float3 cameraDir, float3 cameraUp,
-    rayGenerationKernel.setArg(4, toFloat3(camera.position()));
-    rayGenerationKernel.setArg(5, toFloat3(camera.lookDir()));
-    rayGenerationKernel.setArg(6, toFloat3(camera.up()));
+    rayGenerationKernel.setArg(4, toFloat3(pos));
+    rayGenerationKernel.setArg(5, toFloat3(dir));
+    rayGenerationKernel.setArg(6, toFloat3(up));
     // float fov, float near
     rayGenerationKernel.setArg(7, (perspective->fov() / 180.f * math::pi<float>()));
     rayGenerationKernel.setArg(8, perspective->near());
 
+    // random seed
+    rayGenerationKernel.setArg(3, std::uniform_int_distribution<ulong>{}(engine));
+    renderKernel.setArg(8, std::uniform_int_distribution<ulong>{}(engine));
+
+    // uint spp
+    accumulateKernel.setArg(3, static_cast<uint>(samples));
+
     // ray tracing
-    std::vector<cl::Event> rayGenEvent(1);
+    cl::Event rayGen;
     err = commandQueue.enqueueNDRangeKernel(
-        rayGenerationKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr, rayGenEvent.data()
+        rayGenerationKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr, &rayGen
     );
+    std::vector<cl::Event> preRenderEvents = {rayGen};
+    if (needClear) {
+        cl::Event ev;
+        commandQueue.enqueueNDRangeKernel(clearKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr, &ev);
+        preRenderEvents.emplace_back(ev);
+    }
     std::vector<cl::Event> raytracingEvent(1);
     err = commandQueue.enqueueNDRangeKernel(
-        renderKernel, cl::NullRange, _width * _height, cl::NullRange, &rayGenEvent, raytracingEvent.data()
+        renderKernel, cl::NullRange, _width * _height, cl::NullRange, &preRenderEvents, raytracingEvent.data()
+    );
+    std::vector<cl::Event> accumulateEvent(1);
+    err = commandQueue.enqueueNDRangeKernel(
+        accumulateKernel, cl::NullRange, _width * _height, cl::NullRange, &raytracingEvent, accumulateEvent.data()
     );
     err = commandQueue.enqueueReadBuffer(
-        outputBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &raytracingEvent, nullptr
+        outputBuffer, CL_TRUE, 0, frameBufferSize(), frameBuffer.data(), &accumulateEvent, nullptr
     );
     commandQueue.finish();
     // draw to screen
@@ -347,6 +391,8 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         int err;
         rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr, &err);
         outputBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr, &err);
+        accumulateBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr, &err);
+        sceneBufferNeedUpdate = true;
     }
     return true;
 }
@@ -367,7 +413,17 @@ bool cg::RayTracingRenderer::reloadShader() {
     }
     rayGenerationKernel = cl::Kernel(program, "raygeneration_kernel");
     renderKernel = cl::Kernel(program, "render_kernel");
+    accumulateKernel = cl::Kernel(program, "accumulate_kernel");
+    clearKernel = cl::Kernel(program, "clear_kernel");
     return true;
+}
+
+void cg::RayTracingRenderer::setBounces(uint newBounces) {
+    this->bounces = std::clamp(newBounces, uint(1), uint(15));
+}
+
+int cg::RayTracingRenderer::sampleCount() const {
+    return samples;
 }
 
 template<typename ...Args>

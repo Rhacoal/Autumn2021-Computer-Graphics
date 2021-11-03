@@ -10,6 +10,7 @@
 #include <cl.hpp>
 
 #include <optional>
+#include <random>
 
 namespace cg {
 struct BVH {
@@ -61,9 +62,12 @@ class RayTracingRenderer {
     cl::Kernel testKernel;
     cl::Kernel rayGenerationKernel;
     cl::Kernel renderKernel;
+    cl::Kernel accumulateKernel;
+    cl::Kernel clearKernel;
 
     uint _width{}, _height{};
     cl::Buffer rayBuffer;
+    cl::Buffer accumulateBuffer;
     cl::Buffer outputBuffer;
 
     // scene related buffers
@@ -76,11 +80,19 @@ class RayTracingRenderer {
     std::vector<float> accumulateFrameBuffer;
     std::vector<float> frameBuffer;
 
+    // camera and resampling
     glm::vec3 up, dir, pos;
     int samples = 0;
 
     // cpu related buffers
     std::vector<Ray> rayMemBuffer;
+
+    // random generator
+    std::random_device r{};
+    std::default_random_engine engine{r()};
+
+    // raytracing config
+    uint bounces = 2;
 
     size_t frameBufferSize() const {
         return frameBuffer.size() * sizeof(float);
@@ -97,9 +109,9 @@ public:
 
     void renderCPU(RayTracingScene &scene, Camera &camera);
 
-    int sampleCount() const {
-        return samples;
-    }
+    void setBounces(uint newBounces);
+
+    int sampleCount() const;
 };
 }
 

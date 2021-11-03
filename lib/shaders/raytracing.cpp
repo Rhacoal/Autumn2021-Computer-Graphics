@@ -5,17 +5,8 @@ int next(ulong *seed, int bits) {
     return (int) (*seed >> (48 - bits));
 }
 
-float rand(float2 co) {
-#ifdef __cplusplus
-    return fract(sin(dot(co, float2{12.9898f, 78.233f})) * 43758.5453f);
-#else
-    return fract(sin(dot(co, (float2) (12.9898f, 78.233f))) * 43758.5453f, (float *) 0);
-#endif
-}
-
 float randomFloat(ulong *seed) {
-    float value = (float) next(seed, 24) / (float) (1 << 24);
-    return value;
+    return (float) next(seed, 24) / (float) (1 << 24);
 }
 
 /**
@@ -140,8 +131,9 @@ __kernel void raygeneration_kernel(
     uint width, uint height, ulong globalSeed,
     float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
-    const int pixel_id = get_global_id(0);
+    const uint pixel_id = get_global_id(0);
     ulong seed = globalSeed ^(pixel_id * globalSeed);
+    seed = next(&seed, 48);
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
     float ndc_x = (pixel_x / width) * 2.0f - 1.0f;
@@ -167,6 +159,24 @@ __kernel void raygeneration_kernel(
     output[pixel_id] = ray;
 }
 
+__kernel void clear_kernel(
+    __global float4 *output, uint width, uint height
+) {
+#ifdef __cplusplus
+    output[get_global_id(0)] = float4{0.0f, 0.0f, 0.0f, 0.0f};
+#else
+    output[get_global_id(0)] = (float4) (0.0f, 0.0f, 0.0f, 0.0f);
+#endif
+}
+
+__kernel void accumulate_kernel(
+    __global float4 *input, uint width, uint height, uint spp,
+    __global float4 *output
+) {
+    const uint pixel_id = get_global_id(0);
+    output[pixel_id] = input[pixel_id] / spp;
+}
+
 float3 brdf(__global RayTracingMaterial *materials,
             float3 normal, float3 position, float2 texcoord,
             float3 wi, float3 wo) {
@@ -184,9 +194,9 @@ __kernel void render_kernel(
     __global Ray *rays, uint bounces,
     ulong globalSeed, uint spp
 ) {
-    const int pixel_id = get_global_id(0);
+    const uint pixel_id = get_global_id(0);
     Ray ray = rays[pixel_id];
-    ulong seed = pixel_id ^globalSeed;
+    ulong seed = pixel_id ^(globalSeed * pixel_id);
 #ifdef __cplusplus
     float3 sum = {0.0f, 0.0f, 0.0f};
     float3 color = {0.0f, 0.0f, 0.0f};
@@ -268,7 +278,7 @@ __kernel void render_kernel(
 #ifdef __cplusplus
             color = float3{0.24f, 0.22f, 0.54f};
 #else
-            //                color = (float3)(0.76f, 0.75f, 1.0f);
+            color = (float3) (0.24f, 0.22f, 0.54f);
 #endif
         } else {
             __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
@@ -281,27 +291,32 @@ __kernel void render_kernel(
             color = contrib + material->emmision;
         }
     }
-//    if (bcnt >= 1 && !stack[0].isSky) {
-//        color = (stack[0].normal * 0.5f + 0.5f);
-//    }
+    if (bcnt >= 1 && !stack[0].isSky) {
+        float2 tc = stack[0].texcoord;
+        color.x = tc.x;
+        color.y = tc.y;
+        color.z = 0.0f;
+    }
+//    float times = max(0.0f, (float) bcnt - 2.0f) / ((float) bounces - 1.0f);
 
     uint x = pixel_id % width;
     uint y = pixel_id / width;
     float fx = (float) x / (float) width;
     float fy = (float) y / (float) height;
-//    color = (ray.direction + 1.0f) / 2.0f;
 
 #ifdef __cplusplus
     if (std::isfinite(color.x) && std::isfinite(color.y) && std::isfinite(color.z)) {
         output[pixel_id] = output[pixel_id] + float4{color.x, color.y, color.z, 1.0f};
     }
 #else
-    output[pixel_id] += (float4)(color, 1.0);
+    if (isfinite(color.x) && isfinite(color.y) && isfinite(color.z)) {
+        output[pixel_id] += (float4) (color, 1.0f);
+    }
 #endif
 }
 
 __kernel void test_kernel(__global float4 *output, uint width, uint height) {
-    int pixel_id = get_global_id(0);
+    uint pixel_id = get_global_id(0);
     uint x = pixel_id % width;
     uint y = pixel_id / width;
     float fx = (float) x / (float) width;

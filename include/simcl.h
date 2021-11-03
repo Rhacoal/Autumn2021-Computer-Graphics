@@ -16,7 +16,7 @@ typedef uint16_t ushort;
 #define __global
 #define __kernel
 
-static inline thread_local int workItemId[16];
+static inline thread_local volatile int workItemId[16];
 
 inline void set_global_id(uint dimindx, uint value) {
     workItemId[dimindx] = value;
@@ -28,6 +28,14 @@ inline int get_global_id(uint dimindx) {
 
 inline float4 min(const float4 &a, const float4 &b) {
     return float4{std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z), std::min(a.w, b.w)};
+}
+
+inline float max(float a, float b) {
+    return std::max(a, b);
+}
+
+inline float min(float a, float b) {
+    return std::min(a, b);
 }
 
 inline float4 max(const float4 &a, const float4 &b) {
