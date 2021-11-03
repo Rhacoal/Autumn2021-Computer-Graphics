@@ -122,12 +122,29 @@ inline float dot(const float2 &lhs, const float2 &rhs) {
 inline float fract(float v) {
     return v - floor(v);
 }
+
 inline float3 cross(const float3 &lhs, const float3 &rhs) {
     return float3{
         lhs.y * rhs.z - lhs.z * rhs.y,
         lhs.z * rhs.x - lhs.x * rhs.z,
         lhs.x * rhs.y - lhs.y * rhs.x,
     };
+}
+
+inline float3 vec3(float a) {
+    return float3{a, a, a};
+}
+
+inline float3 vec3(float a, float b, float c) {
+    return float3{a, b, c};
+}
+
+inline float clamp(float v, float min, float max) {
+    return v > max ? max : (v < min ? min : v);
+}
+
+inline float3 mix(const float3& a, const float3& b, float p) {
+    return a + (b - a) * p;
 }
 
 #endif //ASSIGNMENT_SIMCL_H

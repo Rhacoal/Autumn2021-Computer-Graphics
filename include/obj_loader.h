@@ -7,8 +7,6 @@
 #include <filesystem>
 
 namespace cg {
-Object3D *loadObj(const char* path);
-
 Object3D *loadJsonScene(const char* path);
 }
 

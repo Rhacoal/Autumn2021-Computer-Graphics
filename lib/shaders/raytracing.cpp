@@ -1,12 +1,27 @@
 #include "lib/shaders/rt_definition.h"
+#include "lib/shaders/rt_common.h"
+#include "lib/shaders/bxdf.h"
 
-int next(ulong *seed, int bits) {
-    *seed = (*seed * 0x5DEECE66DL + 0xBL) & (((ulong) 1ul << 48) - 1);
-    return (int) (*seed >> (48 - bits));
+float GGX(float nh, float roughness) {
+    float a2 = roughness * roughness;
+    float nh2 = nh * nh;
+    float rcp = RT_M_PI_F * pow2(nh * nh * (a2 - 1.0f));
 }
 
-float randomFloat(ulong *seed) {
-    return (float) next(seed, 24) / (float) (1 << 24);
+float fresnel(float3 l, float3 v, float alpha) {
+
+}
+
+float3 brdf(__global RayTracingMaterial *material,
+            float3 normal, float3 position, float2 texcoord,
+            float3 wi, float3 wo) {
+#ifdef __cplusplus
+    // diffuse
+    float diffuse = dot(wi, normal) / RT_M_PI_F;
+
+#else
+    return (float3) (dot(wi, wo));
+#endif
 }
 
 /**
@@ -98,9 +113,7 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
     Intersection intersection;
     float maxT = 1e20;
     bool hasIntersection = false;
-    float mss = 0;
     while (stackSize) {
-        mss = max(mss, (float) stackSize);
         uint nodeIdx = stack[--stackSize];
         BVHNode node = bvh[nodeIdx];
         if (node.isLeaf) {
@@ -135,9 +148,6 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
                 }
             }
         }
-    }
-    if (!hasIntersection) {
-        output->distance = mss;
     }
 
     return hasIntersection;
@@ -189,17 +199,6 @@ __kernel void accumulate_kernel(
 ) {
     const uint pixel_id = get_global_id(0);
     output[pixel_id] = input[pixel_id] / spp;
-}
-
-float3 brdf(__global RayTracingMaterial *materials,
-            float3 normal, float3 position, float2 texcoord,
-            float3 wi, float3 wo) {
-#ifdef __cplusplus
-    float x = dot(wi, normal) / RT_M_PI_F;
-    return float3{x, x, x};
-#else
-    return (float3) (dot(wi, wo));
-#endif
 }
 
 __kernel void render_kernel(
@@ -282,13 +281,6 @@ __kernel void render_kernel(
         } else {
             // TODO draw sky
             ++bcnt;
-            if (bcnt == 1) {
-                output[pixel_id].x += intersection.distance / 5.0f;
-                output[pixel_id].y += intersection.distance / 5.0f;
-                output[pixel_id].z += intersection.distance / 5.0f;
-                output[pixel_id].w += 1.0f;
-                return;
-            }
             stack[i].isSky = true;
             break;
         }

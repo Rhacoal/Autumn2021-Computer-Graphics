@@ -7,14 +7,17 @@
 #include <lighting.h>
 #include <obj_loader.h>
 #include <rt.h>
-
 #include <helper/axis_helper.h>
+
+#include "lib/shaders/rt_structure.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <perlin_noise.hpp>
 #include <tinyfiledialogs.h>
+
+#include <iostream>
 
 using namespace cg;
 

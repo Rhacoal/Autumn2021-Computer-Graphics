@@ -8,10 +8,6 @@
 #define RT_M_1_PI_F         0.31830987334251f
 #define RT_M_1_PI           0.318309886183790691216
 
-int next(ulong *, int);
-
-float randomFloat(ulong *);
-
 bool intersect(Ray, Triangle, Intersection *);
 
 bool boundsRayIntersects(Ray, Bounds3);

@@ -60,7 +60,6 @@ set(ALL_LIBS
         glad
         glfw
         imgui
-        assimp
         tinydialog
         OpenCL::OpenCL
         ${FRAMEWORKS}
@@ -90,7 +89,7 @@ add_executable(assignment
         lib/util/shader.cpp
         lib/util/texture.cpp
         src/appmain.cpp
-        )
+        lib/shaders/rt_common.h)
 target_link_libraries(assignment
         ${ALL_LIBS}
         )

@@ -6,6 +6,8 @@
 #include <cl.hpp>
 #include <simcl.h>
 
+#else
+#define vec3 (float3)
 #endif
 
 typedef struct RayTracingMaterial {
@@ -13,6 +15,7 @@ typedef struct RayTracingMaterial {
     float3 emmision;
     float transmission;
     float ior;
+    float padding[2];
 } RayTracingMaterial;
 
 typedef struct RayTracingLight {
@@ -22,8 +25,9 @@ typedef struct RayTracingLight {
 typedef struct Vertex {
     float3 position;
     float3 normal;
-    float2 texcoord;
     float3 tangent;
+    float2 texcoord;
+    float2 padding;
 } Vertex;
 
 typedef struct Light {
@@ -82,6 +86,7 @@ typedef struct Bounds3 {
 typedef struct Triangle {
     Vertex v0, v1, v2;
     uint mtlIndex;
+    float padding[3];
 
 #ifdef __cplusplus
 
@@ -100,6 +105,7 @@ typedef struct BVHNode {
     uint offset;
     ushort isLeaf;
     ushort dim;
+    float padding[2];
 } BVHNode;
 
 typedef struct Ray {
@@ -113,7 +119,8 @@ typedef struct Intersection {
     uint index;
     float distance;
     // false if the ray is from outside or true if the ray is from inside
-    bool side;
+    uint side;
+    float padding;
 } Intersection;
 
 #endif //RT_STRUCTURE_H

@@ -4,9 +4,6 @@ endif ()
 
 
 add_definitions(
-        -DTW_STATIC
-        -DTW_NO_LIB_PRAGMA
-        -DTW_NO_DIRECT3D
         -D_CRT_SECURE_NO_WARNINGS
 )
 
@@ -52,12 +49,9 @@ add_library(tinydialog tinydialog-3.8.8/tinyfiledialogs.cpp tinydialog-3.8.8/tin
 target_include_directories(tinydialog PUBLIC tinydialog-3.8.8)
 
 # Compile AssImp
-#set(LIB_INSTALL_DIR "lib")
-#set(ZLIB_LIBRARIES zlib)
-set(BUILD_SHARED_LIBS OFF)
-set(ASSIMP_NO_EXPORT ON)
-set(ASSIMP_BUILD_TESTS OFF)
-set(ASSIMP_BUILD_SAMPLES OFF)
-set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
-add_subdirectory(assimp-5.0.1)
-
+#set(BUILD_SHARED_LIBS ON)
+#set(ASSIMP_NO_EXPORT ON)
+#set(ASSIMP_BUILD_TESTS OFF)
+#set(ASSIMP_BUILD_SAMPLES OFF)
+#set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
+#add_subdirectory(assimp-5.0.1)
