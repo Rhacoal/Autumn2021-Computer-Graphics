@@ -105,8 +105,6 @@ typedef struct BVHNode {
 typedef struct Ray {
     float3 origin;
     float3 direction;
-    char sign[4];
-    float possibility;
 } Ray;
 
 typedef struct Intersection {

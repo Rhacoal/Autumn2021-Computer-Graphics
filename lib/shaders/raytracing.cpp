@@ -1,7 +1,7 @@
 #include "lib/shaders/rt_definition.h"
 
 int next(ulong *seed, int bits) {
-    *seed = (*seed * 0x5DEECE66DLL + 0xBL) & (((ulong) 1ul << 48) - 1);
+    *seed = (*seed * 0x5DEECE66DL + 0xBL) & (((ulong) 1ul << 48) - 1);
     return (int) (*seed >> (48 - bits));
 }
 
@@ -59,10 +59,15 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
     float3 bounds[2] = {bounds3.pMin, bounds3.pMax};
     float tmin, tmax, tymin, tymax, tzmin, tzmax;
 
-    tmin = (bounds[1 - ray.sign[0]].x - ray.origin.x) * inverseRay.x;
-    tmax = (bounds[ray.sign[0]].x - ray.origin.x) * inverseRay.x;
-    tymin = (bounds[1 - ray.sign[1]].y - ray.origin.y) * inverseRay.y;
-    tymax = (bounds[ray.sign[1]].y - ray.origin.y) * inverseRay.y;
+    int sign[3];
+    sign[0] = ray.direction.x > 0;
+    sign[1] = ray.direction.y > 0;
+    sign[2] = ray.direction.z > 0;
+
+    tmin = (bounds[1 - sign[0]].x - ray.origin.x) * inverseRay.x;
+    tmax = (bounds[sign[0]].x - ray.origin.x) * inverseRay.x;
+    tymin = (bounds[1 - sign[1]].y - ray.origin.y) * inverseRay.y;
+    tymax = (bounds[sign[1]].y - ray.origin.y) * inverseRay.y;
 
     if ((tmin > tymax) || (tymin > tmax))
         return false;
@@ -71,8 +76,8 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
     if (tymax < tmax)
         tmax = tymax;
 
-    tzmin = (bounds[1 - ray.sign[2]].z - ray.origin.z) * inverseRay.z;
-    tzmax = (bounds[ray.sign[2]].z - ray.origin.z) * inverseRay.z;
+    tzmin = (bounds[1 - sign[2]].z - ray.origin.z) * inverseRay.z;
+    tzmax = (bounds[sign[2]].z - ray.origin.z) * inverseRay.z;
 
     if ((tmin > tzmax) || (tzmin > tmax))
         return false;
@@ -86,13 +91,16 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
 
 bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primitives, Intersection *output) {
     // TODO: fix possible stack overflow
-    uint stack[64], stackSize;
+    // probably no need...
+    uint stack[64];
     stack[0] = 0;
-    stackSize = 1;
+    uint stackSize = 1;
     Intersection intersection;
     float maxT = 1e20;
     bool hasIntersection = false;
+    float mss = 0;
     while (stackSize) {
+        mss = max(mss, (float) stackSize);
         uint nodeIdx = stack[--stackSize];
         BVHNode node = bvh[nodeIdx];
         if (node.isLeaf) {
@@ -105,13 +113,18 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
                 hasIntersection = true;
             }
         } else {
+            int sign[3];
+            sign[0] = ray.direction.x > 0;
+            sign[1] = ray.direction.y > 0;
+            sign[2] = ray.direction.z > 0;
+
             if (stackSize > 32) {
                 // too shallow, limit width
                 uint t[2] = {nodeIdx + 1, node.offset};
-                if (boundsRayIntersects(ray, bvh[t[ray.sign[node.dim]]].bounds)) {
-                    stack[stackSize++] = t[ray.sign[node.dim]];
-                } else if (boundsRayIntersects(ray, bvh[t[1 - ray.sign[node.dim]]].bounds)) {
-                    stack[stackSize++] = t[1 - ray.sign[node.dim]];
+                if (boundsRayIntersects(ray, bvh[t[sign[node.dim]]].bounds)) {
+                    stack[stackSize++] = t[sign[node.dim]];
+                } else if (boundsRayIntersects(ray, bvh[t[1 - sign[node.dim]]].bounds)) {
+                    stack[stackSize++] = t[1 - sign[node.dim]];
                 }
             } else {
                 if (boundsRayIntersects(ray, bvh[nodeIdx + 1].bounds)) {
@@ -123,6 +136,10 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
             }
         }
     }
+    if (!hasIntersection) {
+        output->distance = mss;
+    }
+
     return hasIntersection;
 }
 
@@ -132,7 +149,7 @@ __kernel void raygeneration_kernel(
     float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
     const uint pixel_id = get_global_id(0);
-    ulong seed = globalSeed ^(pixel_id * globalSeed);
+    ulong seed = globalSeed ^ (pixel_id * globalSeed);
     seed = next(&seed, 48);
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
@@ -153,9 +170,6 @@ __kernel void raygeneration_kernel(
     Ray ray;
     ray.origin = cameraPosition;
     ray.direction = normalize(world_pos - cameraPosition);
-    ray.sign[0] = ray.direction.x > 0;
-    ray.sign[1] = ray.direction.y > 0;
-    ray.sign[2] = ray.direction.z > 0;
     output[pixel_id] = ray;
 }
 
@@ -196,7 +210,7 @@ __kernel void render_kernel(
 ) {
     const uint pixel_id = get_global_id(0);
     Ray ray = rays[pixel_id];
-    ulong seed = pixel_id ^(globalSeed * pixel_id);
+    ulong seed = pixel_id ^ (globalSeed * pixel_id);
 #ifdef __cplusplus
     float3 sum = {0.0f, 0.0f, 0.0f};
     float3 color = {0.0f, 0.0f, 0.0f};
@@ -221,6 +235,7 @@ __kernel void render_kernel(
     } stack[16];
     int bcnt = 0;
     Intersection intersection;
+    intersection.distance = 0.0f;
     for (uint i = 0; i <= bounces; ++i) {
         if (firstIntersection(ray, bvh, triangles, &intersection)) {
             bcnt += 1;
@@ -267,6 +282,13 @@ __kernel void render_kernel(
         } else {
             // TODO draw sky
             ++bcnt;
+            if (bcnt == 1) {
+                output[pixel_id].x += intersection.distance / 5.0f;
+                output[pixel_id].y += intersection.distance / 5.0f;
+                output[pixel_id].z += intersection.distance / 5.0f;
+                output[pixel_id].w += 1.0f;
+                return;
+            }
             stack[i].isSky = true;
             break;
         }
@@ -276,9 +298,9 @@ __kernel void render_kernel(
         if (stack[i].isSky) {
             // TODO IBL sky
 #ifdef __cplusplus
-            color = float3{0.24f, 0.22f, 0.54f};
+            color = float3{0.0f, 0.046f, 0.311f};
 #else
-            color = (float3) (0.24f, 0.22f, 0.54f);
+            color = (float3) (0.0f, 0.046f, 0.311f);
 #endif
         } else {
             __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
@@ -291,13 +313,8 @@ __kernel void render_kernel(
             color = contrib + material->emmision;
         }
     }
-    if (bcnt >= 1 && !stack[0].isSky) {
-        float2 tc = stack[0].texcoord;
-        color.x = tc.x;
-        color.y = tc.y;
-        color.z = 0.0f;
-    }
-//    float times = max(0.0f, (float) bcnt - 2.0f) / ((float) bounces - 1.0f);
+//    color = (stack[0].normal * 0.5f + 0.5f);
+    float times = max(0.0f, (float) bcnt - 2.0f) / ((float) bounces - 1.0f);
 
     uint x = pixel_id % width;
     uint y = pixel_id / width;

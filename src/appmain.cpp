@@ -79,6 +79,7 @@ class AppMain : public cg::Application {
     static constexpr float bulletSpeed = 5 / 60.f;
     static constexpr int bulletMaxLife = 60 * 60;
 public:
+    bool cpuRendering = false;
     static constexpr float camera_dist = 4.f / 1.414f;
 
     AppMain() : camera(45, .1, 500, 16 / 9.f) {
@@ -190,8 +191,11 @@ public:
 
         shaderPasses->renderBegin();
         if (use_ray_tracing) {
-            rtRenderer->render(rtRendererScene, camera);
-//            rtRenderer->renderCPU(rtRendererScene, camera);
+            if (cpuRendering) {
+                rtRenderer->renderCPU(rtRendererScene, camera);
+            } else {
+                rtRenderer->render(rtRendererScene, camera);
+            }
         } else {
             renderer.render(currentScene(), camera);
         }
@@ -397,7 +401,7 @@ public:
             bulletLife = bulletMaxLife;
             rightButtonClicked = false;
         }
-        // update showCursor here since delta would not be have been calculated until next udpate
+        // update showCursor here since delta would not be have been calculated until next update
         if (glfwGetKey(window(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
             glfwGetKey(window(), GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
             if (!showCursor) {
@@ -461,8 +465,14 @@ public:
     }
 };
 
-int main() {
+int main(int argc, const char **argv) {
     AppMain app;
+    for (int i = 0; i < argc; ++i) {
+        // cpu rendering
+        if (strcmp(argv[i], "cpu") == 0) {
+            app.cpuRendering = true;
+        }
+    }
     app.start(cg::ApplicationConfig{
         .window =  {
             .width = 1024, .height = 576,

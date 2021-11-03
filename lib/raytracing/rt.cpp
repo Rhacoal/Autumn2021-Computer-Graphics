@@ -153,19 +153,19 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
     }
     samples += 1;
     CPUDispatcher dispatcher{.cores = 1};
-//    __global Ray *output,
-//    uint width, uint height, ulong globalSeed,
-//        float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
+    // __global Ray *output,
+    // uint width, uint height, ulong globalSeed,
+    // float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
     PerspectiveCamera *perspectiveCamera = camera.isPerspectiveCamera();
 
     dispatcher.dispatch(_width * _height, raygeneration_kernel,
         rayMemBuffer.data(), _width, _height, std::uniform_int_distribution<ulong>()(engine),
         toFloat3(camera.position()), toFloat3(camera.lookDir()), toFloat3(camera.up()),
         perspectiveCamera->fov() / 180.f * math::pi<float>(), perspectiveCamera->near());
-//    __global float4 *output, uint width, uint height,
-//        __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
-//        __global Ray *rays, uint bounces,
-//        ulong globalSeed, uint spp
+    // __global float4 *output, uint width, uint height,
+    // __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
+    // __global Ray *rays, uint bounces,
+    // ulong globalSeed, uint spp
     dispatcher.dispatch(_width * _height, render_kernel,
         reinterpret_cast<float4 *>(accumulateFrameBuffer.data()), _width, _height,
         bvhMemBuffer, triangleMemBuffer, materialMemBuffer,
@@ -184,7 +184,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     int err;
     if (scene.bufferNeedUpdate || sceneBufferNeedUpdate) {
         // TODO actually fill in these buffers
-//        textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
+        // textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
         triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
             scene.triangles.size() * sizeof(Triangle), scene.triangles.data(), &err);
         materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -211,21 +211,22 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         renderKernel.setArg(5, materialBuffer());
         // __global Ray *rays, uint bounces,
         renderKernel.setArg(6, rayBuffer());
-        renderKernel.setArg(7, (uint) bounces);
+        renderKernel.setArg(7, bounces);
         // ulong globalSeed, uint spp
         renderKernel.setArg(8, std::uniform_int_distribution<ulong>{}(engine));
-        renderKernel.setArg(9, (uint) 1);
+        renderKernel.setArg(9, uint(1));
 
         // __global float4 *output, uint width, uint height
-        clearKernel.setArg(0, accumulateBuffer);
+        clearKernel.setArg(0, accumulateBuffer());
         clearKernel.setArg(1, _width);
         clearKernel.setArg(2, _width);
 
         // __global float4 *input, uint width, uint height, uint spp, __global float4 *output
-        accumulateKernel.setArg(0, accumulateBuffer);
+        accumulateKernel.setArg(0, accumulateBuffer());
         accumulateKernel.setArg(1, _width);
         accumulateKernel.setArg(2, _height);
-        accumulateKernel.setArg(4, outputBuffer);
+        accumulateKernel.setArg(3, uint(1));
+        accumulateKernel.setArg(4, outputBuffer());
 
         scene.bufferNeedUpdate = false;
         sceneBufferNeedUpdate = false;
@@ -259,7 +260,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     rayGenerationKernel.setArg(3, std::uniform_int_distribution<ulong>{}(engine));
     renderKernel.setArg(8, std::uniform_int_distribution<ulong>{}(engine));
 
-    // uint spp
+    // spp
     accumulateKernel.setArg(3, static_cast<uint>(samples));
 
     // ray tracing
@@ -270,13 +271,15 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     std::vector<cl::Event> preRenderEvents = {rayGen};
     if (needClear) {
         cl::Event ev;
-        commandQueue.enqueueNDRangeKernel(clearKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr, &ev);
+        err = commandQueue.enqueueNDRangeKernel(clearKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr,
+            &ev);
         preRenderEvents.emplace_back(ev);
     }
     std::vector<cl::Event> raytracingEvent(1);
     err = commandQueue.enqueueNDRangeKernel(
         renderKernel, cl::NullRange, _width * _height, cl::NullRange, &preRenderEvents, raytracingEvent.data()
     );
+    err = raytracingEvent[0].wait();
     std::vector<cl::Event> accumulateEvent(1);
     err = commandQueue.enqueueNDRangeKernel(
         accumulateKernel, cl::NullRange, _width * _height, cl::NullRange, &raytracingEvent, accumulateEvent.data()
