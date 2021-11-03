@@ -83,7 +83,6 @@ add_executable(assignment
         lib/mesh/mesh.cpp
         lib/raytracing/rt.cpp
         lib/raytracing/rt_program.cpp
-        lib/raytracing/simcl.cpp
         lib/scene3d/object3d.cpp
         lib/scene3d/renderer.cpp
         lib/shaders/raytracing.cpp

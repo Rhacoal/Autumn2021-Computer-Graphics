@@ -113,13 +113,18 @@ public:
         currentScene().addChild(dirLight);
 
         // camera
-        camera.setPosition(glm::vec3(5.0f, 1.0f, 5.0f));
-        camera.lookAt(glm::vec3(-1.0f, 0.0f, -1.0f));
+        camera.setPosition(glm::vec3(5.0f, 5.0f, 5.0f));
+        camera.lookAt(glm::vec3(0.0f, 0.0f, 0.0f));
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
-        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(20.0f, 30, 20));
+        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 20, 20));
+        sphere->material()->emmision = glm::vec4{0.5f, 0.0f, 0.0f, 0.0f};
+        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
+        box->setPosition(glm::vec3(1.1f, 0.0f, 0.0f));
+        box->material()->emmision = glm::vec4{0.0f, 0.0f, 0.2f, 0.0f};
         currentScene().addChild(sphere);
+        currentScene().addChild(box);
 
         // axis helper
         currentScene().addChild(new AxisHelper({1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 5));
@@ -186,7 +191,7 @@ public:
         shaderPasses->renderBegin();
         if (use_ray_tracing) {
 //            rtRenderer->render(rtRendererScene, camera);
-            rtRenderer->render(rtRendererScene, camera);
+            rtRenderer->renderCPU(rtRendererScene, camera);
         } else {
             renderer.render(currentScene(), camera);
         }
@@ -229,7 +234,7 @@ public:
                     if (!rtRenderer.has_value()) {
                         rtRenderer.emplace();
                     }
-                    rtRenderer->init(160, 90);
+                    rtRenderer->init(640, 360);
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
                     use_ray_tracing = true;
@@ -269,6 +274,8 @@ public:
             ImGui::Text("options");
             ImGui::Checkbox("skybox", &use_skybox);
 
+
+            ImGui::Text("spp: %d", rtRenderer.has_value() ? rtRenderer.value().sampleCount() : 0);
             ImGui::Text("mouse: (%.2f, %.2f)", lastMouseX, lastMouseY);
             ImGui::Text("average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);

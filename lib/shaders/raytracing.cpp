@@ -1,12 +1,21 @@
-#include "lib/shaders/rt_structure.h"
+#include "lib/shaders/rt_definition.h"
 
 int next(ulong *seed, int bits) {
-    *seed = (*seed * 0x5DEECE66DL + 0xBL) & (((ulong) 1ul << 48) - 1);
+    *seed = (*seed * 0x5DEECE66DLL + 0xBL) & (((ulong) 1ul << 48) - 1);
     return (int) (*seed >> (48 - bits));
 }
 
+float rand(float2 co) {
+#ifdef __cplusplus
+    return fract(sin(dot(co, float2{12.9898f, 78.233f})) * 43758.5453f);
+#else
+    return fract(sin(dot(co, (float2) (12.9898f, 78.233f))) * 43758.5453f, (float *) 0);
+#endif
+}
+
 float randomFloat(ulong *seed) {
-    return (float) next(seed, 24) / (float) (1 << 24);
+    float value = (float) next(seed, 24) / (float) (1 << 24);
+    return value;
 }
 
 /**
@@ -18,7 +27,7 @@ float randomFloat(ulong *seed) {
  */
 bool intersect(Ray ray, Triangle triangle, Intersection *intersection) {
     // Reference:
-    // scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
+    // https://scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
 
     float3 e01 = triangle.v1.position - triangle.v0.position;
     float3 e02 = triangle.v2.position - triangle.v0.position;
@@ -37,6 +46,7 @@ bool intersect(Ray ray, Triangle triangle, Intersection *intersection) {
     if (v < 0 || u + v > 1) return false;
 
     float t = dot(e02, qvec) * invDet;
+    if (t < 0) return false;
 
     intersection->barycentric.x = 1 - u - v;
     intersection->barycentric.y = u;
@@ -131,12 +141,12 @@ __kernel void raygeneration_kernel(
     float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
     const int pixel_id = get_global_id(0);
-    ulong seed = pixel_id ^globalSeed;
+    ulong seed = globalSeed ^(pixel_id * globalSeed);
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
     float ndc_x = (pixel_x / width) * 2.0f - 1.0f;
     float ndc_y = (pixel_y / height) * 2.0f - 1.0f;
-    float aspect = (float) height / (float) width;
+    float aspect = (float) width / (float) height;
     float top = near * tan(fov / 2);
 //    float top = 1.0f / (near * tan(fov));
 #ifdef __cplusplus
@@ -157,6 +167,17 @@ __kernel void raygeneration_kernel(
     output[pixel_id] = ray;
 }
 
+float3 brdf(__global RayTracingMaterial *materials,
+            float3 normal, float3 position, float2 texcoord,
+            float3 wi, float3 wo) {
+#ifdef __cplusplus
+    float x = dot(wi, normal) / RT_M_PI_F;
+    return float3{x, x, x};
+#else
+    return (float3) (dot(wi, wo));
+#endif
+}
+
 __kernel void render_kernel(
     __global float4 *output, uint width, uint height,
     __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
@@ -165,45 +186,104 @@ __kernel void render_kernel(
 ) {
     const int pixel_id = get_global_id(0);
     Ray ray = rays[pixel_id];
+    ulong seed = pixel_id ^globalSeed;
 #ifdef __cplusplus
+    float3 sum = {0.0f, 0.0f, 0.0f};
     float3 color = {0.0f, 0.0f, 0.0f};
 #else
+    float3 sum = (float3) (0.0f);
     float3 color = (float3) (0.0f);
 #endif
-//
+
     // a maximum of 15 bounces is allowed
     struct {
         uint mtlIndex;
         uint primtiveIndex;
         float3 wo;
+        float3 wi;
         float3 p;
+        float3 normal;
+        float2 texcoord;
+        float distance;
+        float pdf;
+        bool side;
+        bool isSky;
     } stack[16];
     int bcnt = 0;
     Intersection intersection;
-    if (firstIntersection(ray, bvh, triangles, &intersection)) {
-//         iteratively select directions
-        for (int i = 0; i < bounces; ++i) {
-            float3 wo = -ray.direction;
-            float3 p = intersection.position;
-            __global RayTracingMaterial *mtl = materials + triangles[intersection.index].mtlIndex;
+    for (uint i = 0; i <= bounces; ++i) {
+        if (firstIntersection(ray, bvh, triangles, &intersection)) {
             bcnt += 1;
+            float3 wo = -ray.direction;
+            float3 pos = intersection.position;
             stack[i].wo = wo;
-            stack[i].p = p;
+            stack[i].p = pos;
             stack[i].mtlIndex = triangles[intersection.index].mtlIndex;
             stack[i].primtiveIndex = intersection.index;
+            stack[i].distance = intersection.distance;
+            stack[i].side = intersection.side;
+
+            // select next position
+            float a = randomFloat(&seed), b = randomFloat(&seed);
+            float phi = RT_M_PI_F * 2.0f * a, theta = acos(b);
+            Triangle triangle = triangles[intersection.index];
+            float3 w = normalize(
+                triangle.v0.normal * intersection.barycentric.x +
+                triangle.v1.normal * intersection.barycentric.y +
+                triangle.v2.normal * intersection.barycentric.z
+            );
+            stack[i].normal = w;
+            stack[i].texcoord = (
+                triangles->v0.texcoord * intersection.barycentric.x +
+                triangles->v1.texcoord * intersection.barycentric.y +
+                triangles->v2.texcoord * intersection.barycentric.z
+            );
+            if (intersection.side) w = -w;
+#ifdef __cplusplus
+            float3 temp = w.x > 0.1 ? float3{0.0f, 1.0f, 0.0f} : float3{1.0f, 0.0f, 0.0f};
+#else
+            float3 temp = w.x > 0.1 ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
+#endif
+            float3 u = normalize(cross(temp, w));
+            float3 v = cross(u, w);
+            float3 next = w * b +
+                          u * sin(theta) * cos(phi) +
+                          v * sin(theta) * sin(phi);
+            stack[i].pdf = RT_M_1_PI * 0.5f; // pdf(phi, theta) = 1 / 2pi
+            stack[i].wi = next;
+            ray.origin = pos + next * 0.001f; // avoid self-intersection
+            ray.direction = next;
+            stack[i].isSky = false;
+        } else {
+            // TODO draw sky
+            ++bcnt;
+            stack[i].isSky = true;
+            break;
         }
-    } else {
-        // TODO draw sky
     }
 
-    for (int i = 0; i < bcnt; ++i) {
-        color.x += 1.0f;
+    for (int i = bcnt - 1; i >= 0; --i) {
+        if (stack[i].isSky) {
+            // TODO IBL sky
+#ifdef __cplusplus
+            color = float3{0.24f, 0.22f, 0.54f};
+#else
+            //                color = (float3)(0.76f, 0.75f, 1.0f);
+#endif
+        } else {
+            __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
+            // TODO finish brdf
+            float3 contrib = color * brdf(
+                material,
+                stack[i].p, stack[i].normal, stack[i].texcoord,
+                stack[i].wi, stack[i].wo
+            ) * dot(stack[i].normal, stack[i].wi) / stack[i].pdf;
+            color = contrib + material->emmision;
+        }
     }
-    if (bcnt) {
-        color = normalize(triangles[intersection.index].v0.normal * 0.5f + 0.5f);
-    }
-//    color = ray.direction * 0.5f + 0.5f;
-
+//    if (bcnt >= 1 && !stack[0].isSky) {
+//        color = (stack[0].normal * 0.5f + 0.5f);
+//    }
 
     uint x = pixel_id % width;
     uint y = pixel_id / width;
@@ -211,11 +291,12 @@ __kernel void render_kernel(
     float fy = (float) y / (float) height;
 //    color = (ray.direction + 1.0f) / 2.0f;
 
-    output[pixel_id] =
 #ifdef __cplusplus
-        float4{color.x / spp, color.y / spp, color.z / spp, 1.0f};
+    if (std::isfinite(color.x) && std::isfinite(color.y) && std::isfinite(color.z)) {
+        output[pixel_id] = output[pixel_id] + float4{color.x, color.y, color.z, 1.0f};
+    }
 #else
-    (float4)(color / spp, 1.0);
+    output[pixel_id] += (float4)(color, 1.0);
 #endif
 }
 

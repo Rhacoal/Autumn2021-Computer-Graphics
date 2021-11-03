@@ -10,5 +10,6 @@ compile_commands.json
 CTestTestfile.cmake
 .idea
 cmake-build-debug
+cmake-build-release
 _deps
 .DS_Store

@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <functional>
 #include <random>
+#include <thread>
 
 void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     bufferNeedUpdate = true;
@@ -40,7 +41,9 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             mtlIndex = mtlIt->second;
         } else {
             auto rtMtl = RayTracingMaterial{
-                .color = {0.5f, 0.5f, 1.0f, 1.0f},
+                .color = toFloat4(mtl->color),
+                .emmision = toFloat4(mtl->emmision),
+                .transmission = 1.0f - mtl->color.a,
                 .ior = 1.35f,
             };
             mtlIndex = materials.size();
@@ -51,21 +54,27 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         if (!position.has_value()) return;
         auto texcoord = bufInfo(geometry->getAttribute("texcoord"));
         auto normal = bufInfo(geometry->getAttribute("normal"));
+        auto modelMatrix = object.modelMatrix();
+        const auto transform = [&](auto &&buf, uint v0, uint size) -> float4 {
+            return toFloat4(modelMatrix * glm::vec4{
+                buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2], 1.0
+            });
+        };
         const auto addTriangle = [&](unsigned int v0, unsigned int v1, unsigned int v2) {
             Triangle triangle{
                 .mtlIndex = mtlIndex,
             };
             // position
             auto[buf, size] = position.value();
-            triangle.v0.position = float3{buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2]};
-            triangle.v1.position = float3{buf[v1 * size + 0], buf[v1 * size + 1], buf[v1 * size + 2]};
-            triangle.v2.position = float3{buf[v2 * size + 0], buf[v2 * size + 1], buf[v2 * size + 2]};
+            triangle.v0.position = transform(buf, v0, size);
+            triangle.v1.position = transform(buf, v1, size);
+            triangle.v2.position = transform(buf, v2, size);
             // texcoord
             if (texcoord.has_value()) {
                 auto[buf, size] = texcoord.value();
-                triangle.v0.texcoord = float3{buf[v0 * size + 0], buf[v0 * size + 1]};
-                triangle.v1.texcoord = float3{buf[v1 * size + 0], buf[v1 * size + 1]};
-                triangle.v2.texcoord = float3{buf[v2 * size + 0], buf[v2 * size + 1]};
+                triangle.v0.texcoord = float2{buf[v0 * size + 0], buf[v0 * size + 1]};
+                triangle.v1.texcoord = float2{buf[v1 * size + 0], buf[v1 * size + 1]};
+                triangle.v2.texcoord = float2{buf[v2 * size + 0], buf[v2 * size + 1]};
             }
             // normal
             if (normal.has_value()) {
@@ -101,6 +110,19 @@ struct CPUDispatcher {
                 set_global_id(0, i);
                 func(std::forward<Args &&>(args)...);
             }
+        } else {
+            std::vector<std::thread> threads;
+            for (int i = 0; i < cores; ++i) {
+                threads.emplace_back([&]() {
+                    for (uint t = i; t < size; t += cores) {
+                        set_global_id(0, t);
+                        func(std::forward<Args &&>(args)...);
+                    }
+                });
+            }
+            for (auto &thread : threads) {
+                thread.join();
+            }
         }
     }
 };
@@ -112,13 +134,25 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
     auto materialMemBuffer = scene.materials.data();
     auto bvhMemBuffer = scene.bvh.nodes.data();
     rayMemBuffer.resize(_width * _height);
+    accumulateFrameBuffer.resize(_width * _height * 4);
+    if (camera.up() != up || camera.lookDir() != dir || camera.position() != pos) {
+        up = camera.up();
+        dir = camera.lookDir();
+        pos = camera.position();
+        samples = 0;
+        std::fill(accumulateFrameBuffer.begin(), accumulateFrameBuffer.end(), 0.0f);
+    }
+    samples += 1;
     CPUDispatcher dispatcher{.cores = 1};
 //    __global Ray *output,
 //    uint width, uint height, ulong globalSeed,
 //        float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
     PerspectiveCamera *perspectiveCamera = camera.isPerspectiveCamera();
+
+    std::random_device r{};
+    std::default_random_engine engine{r()};
     dispatcher.dispatch(_width * _height, raygeneration_kernel,
-        rayMemBuffer.data(), _width, _height, 1,
+        rayMemBuffer.data(), _width, _height, std::uniform_int_distribution<ulong>()(engine),
         toFloat3(camera.position()), toFloat3(camera.lookDir()), toFloat3(camera.up()),
         perspectiveCamera->fov() / 180.f * math::pi<float>(), perspectiveCamera->near());
 //    __global float4 *output, uint width, uint height,
@@ -126,10 +160,15 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
 //        __global Ray *rays, uint bounces,
 //        ulong globalSeed, uint spp
     dispatcher.dispatch(_width * _height, render_kernel,
-        reinterpret_cast<float4*>(frameBuffer.data()), _width, _height,
+        reinterpret_cast<float4 *>(accumulateFrameBuffer.data()), _width, _height,
         bvhMemBuffer, triangleMemBuffer, materialMemBuffer,
-        rayMemBuffer.data(), 1, 1, 1
+        rayMemBuffer.data(), 2,
+        std::uniform_int_distribution<ulong>()(engine), 1
     );
+    CPUDispatcher{.cores = 16}.dispatch(_width * _height * 4, [&]() {
+        uint id = get_global_id(0);
+        frameBuffer[id] = accumulateFrameBuffer[id] / samples;
+    });
     drawFrameBuffer();
 }
 
@@ -142,7 +181,8 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
         materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
         // scene.materials.size() * sizeof(RayTracingMaterial), scene.materials.data(), &err);
-        bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, scene.bvh.nodes.size() * sizeof(BVHNode),
+        bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            scene.bvh.nodes.size() * sizeof(BVHNode),
             scene.bvh.nodes.data(), &err);
         std::random_device r{};
         std::default_random_engine engine{r()};
@@ -304,8 +344,9 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         frameBuffer.resize(_width * _height * 4);
         std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
 
-        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr);
-        outputBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr);
+        int err;
+        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr, &err);
+        outputBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr, &err);
     }
     return true;
 }
@@ -329,51 +370,58 @@ bool cg::RayTracingRenderer::reloadShader() {
     return true;
 }
 
+template<typename ...Args>
+static uint push(std::vector<BVHNode> &nodes, Args &&...args) {
+    uint ret = static_cast<uint>(nodes.size());
+    nodes.emplace_back(std::forward<Args &&>(args)...);
+    return ret;
+};
+
+uint recur(std::vector<BVHNode> &nodes, std::vector<Triangle>::iterator first, std::vector<Triangle>::iterator last,
+           uint baseIndex) {
+    auto length = last - first;
+    if (length == 1) {
+        return push(nodes, BVHNode{first->bounds(), baseIndex, 1}); // leaf
+    }
+    if (length == 2) {
+        auto bounds = first->bounds() + std::next(first)->bounds();
+        unsigned short dim = bounds.maxExtent();
+        auto ret = push(nodes, BVHNode{bounds, 0, 0, dim});
+        if (first->bounds().centroid().s[dim] < (std::next(first))->bounds().centroid().s[dim]) {
+            // left
+            recur(nodes, first, std::next(first), baseIndex);
+            // right
+            nodes[ret].offset = recur(nodes, std::next(first), last, baseIndex + 1);
+        } else {
+            // right
+            recur(nodes, std::next(first), last, baseIndex + 1);
+            // left
+            nodes[ret].offset = recur(nodes, first, std::next(first), baseIndex);
+        }
+        return ret;
+    }
+    auto bounds = first->bounds();
+    auto centroidBounds = Bounds3(bounds.centroid());
+    for (auto i = std::next(first); i != last; ++i) {
+        Bounds3 iBound = i->bounds();
+        bounds += iBound;
+        centroidBounds += iBound.centroid();
+    }
+    auto maxExtend = bounds.maxExtent();
+    std::sort(first, last, [maxExtend](const Triangle &a, const Triangle &b) -> bool {
+        return a.bounds().centroid().s[maxExtend] < b.bounds().centroid().s[maxExtend];
+    });
+
+    auto leftSize = length / 2;
+    auto ret = push(nodes, BVHNode{bounds, 0, 0, maxExtend});
+    recur(nodes, first, first + leftSize, baseIndex);
+    nodes[ret].offset = recur(nodes, first + leftSize, last, baseIndex + leftSize);
+    return ret;
+};
+
 void cg::BVH::buildFromTriangles(std::vector<Triangle> &triangles) {
     nodes.clear();
-    const auto push = [&](auto &&...args) -> uint {
-        uint ret = static_cast<uint>(nodes.size());
-        nodes.emplace_back(std::forward<decltype(args)>(args)...);
-        return ret;
-    };
-    using Iter = std::vector<Triangle>::iterator;
-    const std::function<uint(Iter, Iter, uint)> recur = [&](Iter first, Iter last, uint baseIndex) -> uint {
-        auto length = last - first;
-        if (length == 1) {
-            return push(BVHNode{first->bounds(), baseIndex, 1}); // leaf
-        }
-        if (length == 2) {
-            auto bounds = first->bounds() + std::next(first)->bounds();
-            unsigned short dim = bounds.maxExtent();
-            auto ret = push(BVHNode{bounds, 0, 0, dim});
-            if (first->bounds().centroid().s[dim] < (std::next(first))->bounds().centroid().s[dim]) {
-                recur(first, std::next(first), baseIndex);                         // left
-                nodes[ret].offset = recur(std::next(first), last, baseIndex + 1);  // right
-            } else {
-                recur(std::next(first), last, baseIndex + 1);                      // right
-                nodes[ret].offset = recur(first, std::next(first), baseIndex + 1); // left
-            }
-            return ret;
-        }
-        auto bounds = first->bounds();
-        auto centroidBounds = Bounds3(bounds.centroid());
-        for (auto i = std::next(first); i != last; ++i) {
-            Bounds3 iBound = i->bounds();
-            bounds += iBound;
-            centroidBounds += iBound.centroid();
-        }
-        auto maxExtend = bounds.maxExtent();
-        std::sort(first, last, [maxExtend](const Triangle &a, const Triangle &b) -> bool {
-            return a.bounds().centroid().s[maxExtend] < b.bounds().centroid().s[maxExtend];
-        });
-
-        auto leftSize = length / 2;
-        auto ret = push(BVHNode{bounds, 0, 0, maxExtend});
-        recur(first, first + leftSize, baseIndex);                                  // left
-        nodes[ret].offset = recur(first + leftSize, last, baseIndex + leftSize);    // right
-        return ret;
-    };
-    recur(triangles.begin(), triangles.end(), 0u);
+    recur(nodes, triangles.begin(), triangles.end(), 0u);
 }
 
 const char *trivialShaderVert = R"(
@@ -397,6 +445,7 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
+//    fragColor = vec4(texCoord, 0.0, 1.0);
     fragColor = texture(screenTexture, texCoord);
 }
 )";
@@ -415,7 +464,7 @@ cg::RayTracingRenderer::ShaderParams::ShaderParams() : shader(trivialShaderVert,
     glBindVertexArray(0);
 
     shader.use();
-    glUniform1i(glGetUniformLocation(shader.id, "screenTexture"), 0);
+    shader.setUniform1i("screenTexture", 0);
 }
 
 cg::RayTracingRenderer::ShaderParams::~ShaderParams() {

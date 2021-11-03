@@ -73,10 +73,14 @@ class RayTracingRenderer {
     cl::Buffer bvhBuffer;
     cl::Buffer lightBuffer;
 
+    std::vector<float> accumulateFrameBuffer;
+    std::vector<float> frameBuffer;
+
+    glm::vec3 up, dir, pos;
+    int samples = 0;
+
     // cpu related buffers
     std::vector<Ray> rayMemBuffer;
-
-    std::vector<float> frameBuffer;
 
     size_t frameBufferSize() const {
         return frameBuffer.size() * sizeof(float);
@@ -92,6 +96,10 @@ public:
     void render(RayTracingScene &scene, Camera &camera);
 
     void renderCPU(RayTracingScene &scene, Camera &camera);
+
+    int sampleCount() const {
+        return samples;
+    }
 };
 }
 

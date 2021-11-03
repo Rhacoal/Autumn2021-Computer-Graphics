@@ -20,6 +20,7 @@ class Material {
 public:
     const int id;
     glm::vec4 color{1.0f};
+    glm::vec4 emmision{0.0f};
 
     Material() : id(latest_id++) {}
 

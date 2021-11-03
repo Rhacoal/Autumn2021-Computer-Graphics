@@ -9,7 +9,9 @@
 #endif
 
 typedef struct RayTracingMaterial {
-    float4 color;
+    float3 color;
+    float3 emmision;
+    float transmission;
     float ior;
 } RayTracingMaterial;
 
@@ -20,7 +22,7 @@ typedef struct RayTracingLight {
 typedef struct Vertex {
     float3 position;
     float3 normal;
-    float3 texcoord;
+    float2 texcoord;
     float3 tangent;
 } Vertex;
 
