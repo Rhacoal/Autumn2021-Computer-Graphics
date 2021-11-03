@@ -122,13 +122,22 @@ public:
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
-        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 20, 20));
-        sphere->material()->emmision = glm::vec4{0.5f, 0.0f, 0.0f, 0.0f};
+        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.5f, 20, 20));
+        sphere->material()->emmision = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
+        sphere->material()->color = glm::vec4{1.0f, 0.0f, 0.0f, 0.0f};
         auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
-        box->setPosition(glm::vec3(1.1f, 0.0f, 0.0f));
-        box->material()->emmision = glm::vec4{0.0f, 0.0f, 0.2f, 0.0f};
+        box->setPosition(glm::vec3(1.5f, 0.0f, 0.0f));
+        box->material()->emmision = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
+        box->material()->color = glm::vec4{0.0f, 1.0f, 0.0f, 0.0f};
+        auto lightBall = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
+        lightBall->setPosition(glm::vec3(0.75f, 0.0f, -1.5f));
+        lightBall->material()->emmision = glm::vec4{50.0f, 50.0f, 20.0f, 0.0f};
+        lightBall->material()->color = glm::vec4{1.0f, 1.0f, 1.0f, 0.0f};
+        auto bigBox = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(20.0f, 20.0f, 20.0f));
         currentScene().addChild(sphere);
         currentScene().addChild(box);
+        currentScene().addChild(lightBall);
+        currentScene().addChild(bigBox);
 
         // axis helper
         currentScene().addChild(new AxisHelper({1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 5));

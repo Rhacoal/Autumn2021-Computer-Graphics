@@ -11,11 +11,12 @@
 #endif
 
 typedef struct RayTracingMaterial {
-    float3 color;
-    float3 emmision;
-    float transmission;
+    float3 albedo;
+    float3 emission;
+    float metallic;
+    float roughness;
+    float specTrans;
     float ior;
-    float padding[2];
 } RayTracingMaterial;
 
 typedef struct RayTracingLight {

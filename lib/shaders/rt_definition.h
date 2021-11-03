@@ -14,7 +14,7 @@ bool boundsRayIntersects(Ray, Bounds3);
 
 bool firstIntersection(Ray, __global BVHNode *, __global Triangle *, Intersection *);
 
-float3 brdf(__global RayTracingMaterial *materials,
+float3 BxDF(__global RayTracingMaterial *material,
             float3 normal, float3 position, float2 texcoord,
             float3 wi, float3 wo);
 

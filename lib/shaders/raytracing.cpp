@@ -2,26 +2,12 @@
 #include "lib/shaders/rt_common.h"
 #include "lib/shaders/bxdf.h"
 
-float GGX(float nh, float roughness) {
-    float a2 = roughness * roughness;
-    float nh2 = nh * nh;
-    float rcp = RT_M_PI_F * pow2(nh * nh * (a2 - 1.0f));
-}
-
-float fresnel(float3 l, float3 v, float alpha) {
-
-}
-
-float3 brdf(__global RayTracingMaterial *material,
+float3 BxDF(__global RayTracingMaterial *material,
             float3 normal, float3 position, float2 texcoord,
             float3 wi, float3 wo) {
-#ifdef __cplusplus
-    // diffuse
-    float diffuse = dot(wi, normal) / RT_M_PI_F;
-
-#else
-    return (float3) (dot(wi, wo));
-#endif
+    float3 reflection = Disney_BRDF(wi, wo, normal, material->albedo, 0.0f,
+        material->metallic, 0.5f, 0.0f, material->roughness);
+    return reflection;
 }
 
 /**
@@ -159,7 +145,7 @@ __kernel void raygeneration_kernel(
     float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
     const uint pixel_id = get_global_id(0);
-    ulong seed = globalSeed ^ (pixel_id * globalSeed);
+    ulong seed = globalSeed ^(pixel_id * globalSeed);
     seed = next(&seed, 48);
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
@@ -209,7 +195,7 @@ __kernel void render_kernel(
 ) {
     const uint pixel_id = get_global_id(0);
     Ray ray = rays[pixel_id];
-    ulong seed = pixel_id ^ (globalSeed * pixel_id);
+    ulong seed = pixel_id ^(globalSeed * pixel_id);
 #ifdef __cplusplus
     float3 sum = {0.0f, 0.0f, 0.0f};
     float3 color = {0.0f, 0.0f, 0.0f};
@@ -247,9 +233,6 @@ __kernel void render_kernel(
             stack[i].distance = intersection.distance;
             stack[i].side = intersection.side;
 
-            // select next position
-            float a = randomFloat(&seed), b = randomFloat(&seed);
-            float phi = RT_M_PI_F * 2.0f * a, theta = acos(b);
             Triangle triangle = triangles[intersection.index];
             float3 w = normalize(
                 triangle.v0.normal * intersection.barycentric.x +
@@ -262,18 +245,29 @@ __kernel void render_kernel(
                 triangles->v1.texcoord * intersection.barycentric.y +
                 triangles->v2.texcoord * intersection.barycentric.z
             );
+            // select next position
+            float a = randomFloat(&seed), b = randomFloat(&seed);
+            float phi = RT_M_PI_F * 2.0f * a, theta = acos(b);
             if (intersection.side) w = -w;
 #ifdef __cplusplus
             float3 temp = w.x > 0.1 ? float3{0.0f, 1.0f, 0.0f} : float3{1.0f, 0.0f, 0.0f};
 #else
             float3 temp = w.x > 0.1 ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
 #endif
+//            if (materials[triangle.mtlIndex].specTrans > 0.01) {
+//                if (randomFloat(&seed) < 0.5) {
+//                    // refraction
+//                    theta = RT_M_PI_F - theta;
+//                }
+//                stack[i].pdf = RT_M_1_PI_F * 0.25f;
+//            } else {
+            stack[i].pdf = RT_M_1_PI_F * 0.5f; // pdf(phi, theta) = 1 / 2pi
+//            }
             float3 u = normalize(cross(temp, w));
             float3 v = cross(u, w);
             float3 next = w * b +
                           u * sin(theta) * cos(phi) +
                           v * sin(theta) * sin(phi);
-            stack[i].pdf = RT_M_1_PI * 0.5f; // pdf(phi, theta) = 1 / 2pi
             stack[i].wi = next;
             ray.origin = pos + next * 0.001f; // avoid self-intersection
             ray.direction = next;
@@ -289,20 +283,17 @@ __kernel void render_kernel(
     for (int i = bcnt - 1; i >= 0; --i) {
         if (stack[i].isSky) {
             // TODO IBL sky
-#ifdef __cplusplus
-            color = float3{0.0f, 0.046f, 0.311f};
-#else
-            color = (float3) (0.0f, 0.046f, 0.311f);
-#endif
+//            color = vec3(0.0f, 0.046f, 0.311f);
+            color = vec3(0.0f);
         } else {
             __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
             // TODO finish brdf
-            float3 contrib = color * brdf(
+            float3 contrib = color * BxDF(
                 material,
                 stack[i].p, stack[i].normal, stack[i].texcoord,
                 stack[i].wi, stack[i].wo
             ) * dot(stack[i].normal, stack[i].wi) / stack[i].pdf;
-            color = contrib + material->emmision;
+            color = contrib + material->emission;
         }
     }
 //    color = (stack[0].normal * 0.5f + 0.5f);

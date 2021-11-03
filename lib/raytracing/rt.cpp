@@ -41,9 +41,11 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             mtlIndex = mtlIt->second;
         } else {
             auto rtMtl = RayTracingMaterial{
-                .color = toFloat4(mtl->color),
-                .emmision = toFloat4(mtl->emmision),
-                .transmission = 1.0f - mtl->color.a,
+                .albedo = toFloat4(mtl->color),
+                .emission = toFloat4(mtl->emmision),
+                .metallic = 0.5f,
+                .roughness = 0.5f,
+                .specTrans = 0.0f,
                 .ior = 1.35f,
             };
             mtlIndex = materials.size();
@@ -320,7 +322,7 @@ bool cg::RayTracingRenderer::initCL() {
         }
         text << "Enter a number: (1 ~ " << platforms.size() << ')';
 
-        platform_index = 0;
+//        platform_index = 0;
         // Pick one platform
         while (platform_index == -1) {
             auto text_str = text.str();
