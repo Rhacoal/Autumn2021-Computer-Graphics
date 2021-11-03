@@ -143,7 +143,8 @@ inline float clamp(float v, float min, float max) {
     return v > max ? max : (v < min ? min : v);
 }
 
-inline float3 mix(const float3& a, const float3& b, float p) {
+template<typename T1, typename T2, typename P>
+inline decltype(auto) mix(T1 &&a, T2 &&b, P &&p) {
     return a + (b - a) * p;
 }
 
