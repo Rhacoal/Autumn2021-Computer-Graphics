@@ -80,5 +80,5 @@ void main() {
 #endif
     result.rgb += ambientLight;
 
-    fragColor = vec4(result, opacity) * color;
+    fragColor = vec4(result, opacity);// * color;
 }

@@ -5,6 +5,7 @@
 float3 BxDF(__global RayTracingMaterial *material,
             float3 normal, float3 position, float2 texcoord,
             float3 wi, float3 wo) {
+    return vec3(dot(wi, normal)) * material->albedo * RT_M_1_PI_F;
     float3 reflection = Disney_BRDF(wi, wo, normal, material->albedo, 0.0f,
         material->metallic, 0.5f, 0.0f, material->roughness);
     return reflection;
@@ -98,8 +99,10 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
     uint stackSize = 1;
     Intersection intersection;
     float maxT = 1e20;
+    float mss = 0.0f;
     bool hasIntersection = false;
     while (stackSize) {
+        mss = max(mss, (float) stackSize);
         uint nodeIdx = stack[--stackSize];
         BVHNode node = bvh[nodeIdx];
         if (node.isLeaf) {
@@ -107,6 +110,7 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
                 if (intersection.distance < maxT) {
                     maxT = intersection.distance;
                     intersection.index = node.offset;
+                    intersection.position = ray.origin + ray.direction * intersection.distance;
                     *output = intersection;
                 }
                 hasIntersection = true;
@@ -135,6 +139,7 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
             }
         }
     }
+    output->padding = mss;
 
     return hasIntersection;
 }
@@ -234,12 +239,14 @@ __kernel void render_kernel(
             stack[i].side = intersection.side;
 
             Triangle triangle = triangles[intersection.index];
-            float3 w = normalize(
+            float3 normal = normalize(
                 triangle.v0.normal * intersection.barycentric.x +
                 triangle.v1.normal * intersection.barycentric.y +
                 triangle.v2.normal * intersection.barycentric.z
             );
-            stack[i].normal = w;
+            if (intersection.side) normal = -normal;
+            float3 w = normal;
+            stack[i].normal = normal;
             stack[i].texcoord = (
                 triangles->v0.texcoord * intersection.barycentric.x +
                 triangles->v1.texcoord * intersection.barycentric.y +
@@ -247,13 +254,8 @@ __kernel void render_kernel(
             );
             // select next position
             float a = randomFloat(&seed), b = randomFloat(&seed);
-            float phi = RT_M_PI_F * 2.0f * a, theta = acos(b);
-            if (intersection.side) w = -w;
-#ifdef __cplusplus
-            float3 temp = w.x > 0.1 ? float3{0.0f, 1.0f, 0.0f} : float3{1.0f, 0.0f, 0.0f};
-#else
-            float3 temp = w.x > 0.1 ? (float3)(0.0f, 1.0f, 0.0f) : (float3)(1.0f, 0.0f, 0.0f);
-#endif
+            float phi = RT_M_PI_F * 20.0f * a, theta = acos(b);
+            float3 temp = w.x > 0.1 ? vec3(0.0f, 1.0f, 0.0f) : vec3(1.0f, 0.0f, 0.0f);
 //            if (materials[triangle.mtlIndex].specTrans > 0.01) {
 //                if (randomFloat(&seed) < 0.5) {
 //                    // refraction
@@ -264,7 +266,7 @@ __kernel void render_kernel(
             stack[i].pdf = RT_M_1_PI_F * 0.5f; // pdf(phi, theta) = 1 / 2pi
 //            }
             float3 u = normalize(cross(temp, w));
-            float3 v = cross(u, w);
+            float3 v = cross(w, u);
             float3 next = w * b +
                           u * sin(theta) * cos(phi) +
                           v * sin(theta) * sin(phi);
@@ -288,7 +290,7 @@ __kernel void render_kernel(
         } else {
             __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
             // TODO finish brdf
-            float3 contrib = color * BxDF(
+            float3 contrib = vec3(1.0f) * BxDF(
                 material,
                 stack[i].p, stack[i].normal, stack[i].texcoord,
                 stack[i].wi, stack[i].wo
@@ -296,8 +298,10 @@ __kernel void render_kernel(
             color = contrib + material->emission;
         }
     }
-//    color = (stack[0].normal * 0.5f + 0.5f);
-    float times = max(0.0f, (float) bcnt - 2.0f) / ((float) bounces - 1.0f);
+//    color = vec3((bcnt - 1.0f) / (bounces));
+    if (stack[0].isSky) {
+        color = vec3((intersection.padding) / 5.0f);
+    }
 
     uint x = pixel_id % width;
     uint y = pixel_id / width;

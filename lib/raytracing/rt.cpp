@@ -322,7 +322,7 @@ bool cg::RayTracingRenderer::initCL() {
         }
         text << "Enter a number: (1 ~ " << platforms.size() << ')';
 
-//        platform_index = 0;
+        platform_index = 0;
         // Pick one platform
         while (platform_index == -1) {
             auto text_str = text.str();
@@ -357,7 +357,7 @@ bool cg::RayTracingRenderer::initCL() {
         }
         text << "Enter a number (1 ~ " << devices.size() << ')';
 
-        device_index = 0;
+//        device_index = 0;
         while (device_index == -1) {
             auto text_str = text.str();
             char *ret = tinyfd_inputBox("Select a OpenCL device", text_str.c_str(), "");
