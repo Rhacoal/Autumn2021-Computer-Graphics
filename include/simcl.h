@@ -58,6 +58,14 @@ inline float4 operator+(float lhs, const float4 &rhs) {
     return float4{lhs + rhs.x, lhs + rhs.y, lhs + rhs.z, lhs + rhs.w};
 }
 
+inline float4& operator+=(float4 &lhs, const float4 &rhs) {
+    lhs.x += rhs.x;
+    lhs.y += rhs.y;
+    lhs.z += rhs.z;
+    lhs.w += rhs.w;
+    return lhs;
+}
+
 inline float4 operator*(const float4 &lhs, const float4 &rhs) {
     return float4{lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w + rhs.w};
 }
@@ -70,12 +78,28 @@ inline float4 operator*(const float4 &lhs, float rhs) {
     return float4{lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs};
 }
 
+inline float4& operator*=(float4 &lhs, const float4 &rhs) {
+    lhs.x *= rhs.x;
+    lhs.y *= rhs.y;
+    lhs.z *= rhs.z;
+    lhs.w *= rhs.w;
+    return lhs;
+}
+
 inline float4 operator/(float lhs, const float4 &rhs) {
     return float4{lhs / rhs.x, lhs / rhs.y, lhs / rhs.z, lhs / rhs.w};
 }
 
 inline float4 operator/(const float4 &lhs, float rhs) {
     return float4{lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs};
+}
+
+inline float4& operator/=(float4 &lhs, const float4 &rhs) {
+    lhs.x /= rhs.x;
+    lhs.y /= rhs.y;
+    lhs.z /= rhs.z;
+    lhs.w /= rhs.w;
+    return lhs;
 }
 
 inline float4 operator+(const float4 &f4) {
@@ -139,6 +163,18 @@ inline float3 vec3(float a, float b, float c) {
     return float3{a, b, c};
 }
 
+inline float4 vec4(float a) {
+    return float4{a, a, a, a};
+}
+
+inline float4 vec4(float a, float b, float c, float d) {
+    return float4{a, b, c, d};
+}
+
+inline float4 vec4(const float3& v, float d) {
+    return float4{v.x, v.y, v.z, d};
+}
+
 inline float clamp(float v, float min, float max) {
     return v > max ? max : (v < min ? min : v);
 }
@@ -147,5 +183,7 @@ template<typename T1, typename T2, typename P>
 inline decltype(auto) mix(T1 &&a, T2 &&b, P &&p) {
     return a + (b - a) * p;
 }
+
+using std::isfinite;
 
 #endif //ASSIGNMENT_SIMCL_H

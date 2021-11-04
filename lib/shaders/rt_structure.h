@@ -8,6 +8,7 @@
 
 #else
 #define vec3 (float3)
+#define vec4 (float4)
 #endif
 
 typedef struct RayTracingMaterial {

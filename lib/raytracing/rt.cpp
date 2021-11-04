@@ -42,9 +42,9 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         } else {
             auto rtMtl = RayTracingMaterial{
                 .albedo = toFloat4(mtl->color),
-                .emission = toFloat4(mtl->emmision),
-                .metallic = 0.5f,
-                .roughness = 0.5f,
+                .emission = toFloat4(mtl->emission),
+                .metallic = 0.1f,
+                .roughness = 0.1f,
                 .specTrans = 0.0f,
                 .ior = 1.35f,
             };
@@ -411,9 +411,9 @@ bool cg::RayTracingRenderer::reloadShader() {
     if (result) {
         fprintf(stderr, "error during compilation (%d):\n", result);
     }
+    auto buildLog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
+    puts(buildLog.c_str());
     if (result == CL_BUILD_PROGRAM_FAILURE) {
-        auto buildLog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
-        puts(buildLog.c_str());
         return false;
     }
     rayGenerationKernel = cl::Kernel(program, "raygeneration_kernel");

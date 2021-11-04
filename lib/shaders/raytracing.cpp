@@ -6,9 +6,9 @@ float3 BxDF(__global RayTracingMaterial *material,
             float3 normal, float3 position, float2 texcoord,
             float3 wi, float3 wo) {
     return vec3(dot(wi, normal)) * material->albedo * RT_M_1_PI_F;
-    float3 reflection = Disney_BRDF(wi, wo, normal, material->albedo, 0.0f,
-        material->metallic, 0.5f, 0.0f, material->roughness);
-    return reflection;
+//    float3 reflection = Disney_BRDF(wi, wo, normal, material->albedo, 0.0f,
+//        material->metallic, 0.5f, 0.0f, material->roughness);
+//    return reflection;
 }
 
 /**
@@ -145,12 +145,12 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
 }
 
 __kernel void raygeneration_kernel(
-    __global Ray *output,
-    uint width, uint height, ulong globalSeed,
-    float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
+        __global Ray *output,
+        uint width, uint height, ulong globalSeed,
+        float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
     const uint pixel_id = get_global_id(0);
-    ulong seed = globalSeed ^(pixel_id * globalSeed);
+    ulong seed = globalSeed ^ (pixel_id * globalSeed);
     seed = next(&seed, 48);
     float pixel_x = pixel_id % width + randomFloat(&seed);
     float pixel_y = pixel_id / width + randomFloat(&seed);
@@ -159,11 +159,7 @@ __kernel void raygeneration_kernel(
     float aspect = (float) width / (float) height;
     float top = near * tan(fov / 2);
 //    float top = 1.0f / (near * tan(fov));
-#ifdef __cplusplus
-    float3 near_pos = float3{ndc_x * top * aspect, ndc_y * top, -near};
-#else
-    float3 near_pos = (float3) (ndc_x * top * aspect, ndc_y * top, -near);
-#endif
+    float3 near_pos = vec3(ndc_x * top * aspect, ndc_y * top, -near);
     float3 cameraX = cross(cameraDir, cameraUp);
     float3 cameraY = cross(cameraX, cameraDir);
     float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * (-cameraDir) + cameraPosition;
@@ -175,39 +171,30 @@ __kernel void raygeneration_kernel(
 }
 
 __kernel void clear_kernel(
-    __global float4 *output, uint width, uint height
+        __global float4 *output, uint width, uint height
 ) {
-#ifdef __cplusplus
-    output[get_global_id(0)] = float4{0.0f, 0.0f, 0.0f, 0.0f};
-#else
-    output[get_global_id(0)] = (float4) (0.0f, 0.0f, 0.0f, 0.0f);
-#endif
+    output[get_global_id(0)] = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 __kernel void accumulate_kernel(
-    __global float4 *input, uint width, uint height, uint spp,
-    __global float4 *output
+        __global float4 *input, uint width, uint height, uint spp,
+        __global float4 *output
 ) {
     const uint pixel_id = get_global_id(0);
-    output[pixel_id] = input[pixel_id] / spp;
+    output[pixel_id] = input[pixel_id] / (float) spp;
 }
 
 __kernel void render_kernel(
-    __global float4 *output, uint width, uint height,
-    __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
-    __global Ray *rays, uint bounces,
-    ulong globalSeed, uint spp
+        __global float4 *output, uint width, uint height,
+        __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
+        __global Ray *rays, uint bounces,
+        ulong globalSeed, uint spp
 ) {
     const uint pixel_id = get_global_id(0);
     Ray ray = rays[pixel_id];
-    ulong seed = pixel_id ^(globalSeed * pixel_id);
-#ifdef __cplusplus
-    float3 sum = {0.0f, 0.0f, 0.0f};
-    float3 color = {0.0f, 0.0f, 0.0f};
-#else
-    float3 sum = (float3) (0.0f);
-    float3 color = (float3) (0.0f);
-#endif
+    ulong seed = pixel_id ^ (globalSeed * pixel_id);
+    float3 sum = vec3(0.0);
+    float3 color = vec3(0.0);
 
     // a maximum of 15 bounces is allowed
     struct {
@@ -215,9 +202,10 @@ __kernel void render_kernel(
         uint primtiveIndex;
         float3 wo;
         float3 wi;
-        float3 p;
+        float3 position;
         float3 normal;
         float2 texcoord;
+        Ray ray;
         float distance;
         float pdf;
         bool side;
@@ -232,7 +220,7 @@ __kernel void render_kernel(
             float3 wo = -ray.direction;
             float3 pos = intersection.position;
             stack[i].wo = wo;
-            stack[i].p = pos;
+            stack[i].position = pos;
             stack[i].mtlIndex = triangles[intersection.index].mtlIndex;
             stack[i].primtiveIndex = intersection.index;
             stack[i].distance = intersection.distance;
@@ -240,17 +228,17 @@ __kernel void render_kernel(
 
             Triangle triangle = triangles[intersection.index];
             float3 normal = normalize(
-                triangle.v0.normal * intersection.barycentric.x +
-                triangle.v1.normal * intersection.barycentric.y +
-                triangle.v2.normal * intersection.barycentric.z
+                    triangle.v0.normal * intersection.barycentric.x +
+                    triangle.v1.normal * intersection.barycentric.y +
+                    triangle.v2.normal * intersection.barycentric.z
             );
             if (intersection.side) normal = -normal;
             float3 w = normal;
             stack[i].normal = normal;
             stack[i].texcoord = (
-                triangles->v0.texcoord * intersection.barycentric.x +
-                triangles->v1.texcoord * intersection.barycentric.y +
-                triangles->v2.texcoord * intersection.barycentric.z
+                    triangles->v0.texcoord * intersection.barycentric.x +
+                    triangles->v1.texcoord * intersection.barycentric.y +
+                    triangles->v2.texcoord * intersection.barycentric.z
             );
             // select next position
             float a = randomFloat(&seed), b = randomFloat(&seed);
@@ -267,12 +255,13 @@ __kernel void render_kernel(
 //            }
             float3 u = normalize(cross(temp, w));
             float3 v = cross(w, u);
-            float3 next = w * b +
+            float3 next = normalize(w * b +
                           u * sin(theta) * cos(phi) +
-                          v * sin(theta) * sin(phi);
+                          v * sin(theta) * sin(phi));
             stack[i].wi = next;
             ray.origin = pos + next * 0.001f; // avoid self-intersection
             ray.direction = next;
+            stack[i].ray = ray;
             stack[i].isSky = false;
         } else {
             // TODO draw sky
@@ -290,10 +279,10 @@ __kernel void render_kernel(
         } else {
             __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
             // TODO finish brdf
-            float3 contrib = vec3(1.0f) * BxDF(
-                material,
-                stack[i].p, stack[i].normal, stack[i].texcoord,
-                stack[i].wi, stack[i].wo
+            float3 contrib = color * BxDF(
+                    material,
+                    stack[i].normal, stack[i].position, stack[i].texcoord,
+                    stack[i].wi, stack[i].wo
             ) * dot(stack[i].normal, stack[i].wi) / stack[i].pdf;
             color = contrib + material->emission;
         }
@@ -301,6 +290,9 @@ __kernel void render_kernel(
 //    color = vec3((bcnt - 1.0f) / (bounces));
     if (stack[0].isSky) {
         color = vec3((intersection.padding) / 5.0f);
+        color = vec3((intersection.padding) / 5.0f);
+    } else {
+//        color = stack[0].ray.direction * 0.5f + 0.5f;
     }
 
     uint x = pixel_id % width;
@@ -308,15 +300,9 @@ __kernel void render_kernel(
     float fx = (float) x / (float) width;
     float fy = (float) y / (float) height;
 
-#ifdef __cplusplus
-    if (std::isfinite(color.x) && std::isfinite(color.y) && std::isfinite(color.z)) {
-        output[pixel_id] = output[pixel_id] + float4{color.x, color.y, color.z, 1.0f};
-    }
-#else
     if (isfinite(color.x) && isfinite(color.y) && isfinite(color.z)) {
-        output[pixel_id] += (float4) (color, 1.0f);
+        output[pixel_id] += vec4(color, 1.0f);
     }
-#endif
 }
 
 __kernel void test_kernel(__global float4 *output, uint width, uint height) {
@@ -325,10 +311,5 @@ __kernel void test_kernel(__global float4 *output, uint width, uint height) {
     uint y = pixel_id / width;
     float fx = (float) x / (float) width;
     float fy = (float) y / (float) height;
-    output[pixel_id] =
-#ifdef __cplusplus
-        float4{fx, fy, 0.0f, 1.0f};
-#else
-    (float4)(fx, fy, 0, 1.0);
-#endif
+    output[pixel_id] = vec4(fx, fy, 0.0f, 1.0f);
 }

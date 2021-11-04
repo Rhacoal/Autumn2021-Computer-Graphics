@@ -28,7 +28,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
     prevKey = key;
     // if update is needed, recompile a shader
     if (_shader_need_update) {
-        puts("recreating shader.");
+        puts(shader.id ? "Recreating phong shader." : "Creating phong shader.");
         std::string vert = phong_vertex;
         std::string frag = phong_fragment;
         const char *header_tag = "// {headers}";

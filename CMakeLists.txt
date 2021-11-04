@@ -13,8 +13,17 @@ if (APPLE)
 endif ()
 
 find_package(OpenGL REQUIRED)
-find_package(OpenCL REQUIRED)
-include_directories(${OpenCL_INCLUDE_DIRS})
+
+# if CUDA is detected, use CUDA OpenCL
+find_package(CUDAToolkit)
+if (CUDAToolkit_FOUND)
+    set(OpenCL_LIB CUDA::OpenCL)
+    include_directories(${CUDAToolkit_INCLUDE_DIR})
+else ()
+    find_package(OpenCL REQUIRED)
+    set(OpenCL_LIB OpenCL::OpenCL)
+    include_directories(${OpenCL_INCLUDE_DIRS})
+endif ()
 
 if (NOT ${OpenCL_Found})
     message(FATAL_ERROR "OpenCL not found")
@@ -35,10 +44,10 @@ endif ()
 add_subdirectory(external)
 
 # On Visual 2005 and above, this module can set the debug working directory
-cmake_policy(SET CMP0026 OLD)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/rpavlik-cmake-modules-fe2273")
-include(CreateLaunchers)
-include(MSVCMultipleProcessCompile) # /MP
+#cmake_policy(SET CMP0026 OLD)
+#list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/rpavlik-cmake-modules-fe2273")
+#include(CreateLaunchers)
+#include(MSVCMultipleProcessCompile) # /MP
 
 if (INCLUDE_DISTRIB)
     add_subdirectory(distrib)
@@ -61,7 +70,7 @@ set(ALL_LIBS
         glfw
         imgui
         tinydialog
-        OpenCL::OpenCL
+        ${OpenCL_LIB}
         ${FRAMEWORKS}
         )
 
@@ -81,7 +90,6 @@ add_executable(assignment
         lib/mesh/material.cpp
         lib/mesh/mesh.cpp
         lib/raytracing/rt.cpp
-        lib/raytracing/rt_program.cpp
         lib/scene3d/object3d.cpp
         lib/scene3d/renderer.cpp
         lib/shaders/raytracing.cpp
@@ -95,7 +103,7 @@ target_link_libraries(assignment
         )
 # Xcode and Visual working directories
 set_target_properties(assignment PROPERTIES XCODE_ATTRIBUTE_CONFIGURATION_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
-create_target_launcher(assignment WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
+#create_target_launcher(assignment WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
 
 add_custom_target(copy_assets
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
