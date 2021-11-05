@@ -121,10 +121,17 @@ struct CPUDispatcher {
             }
         } else {
             std::vector<std::thread> threads;
+            uint tasks[128];
             for (int i = 0; i < cores; ++i) {
-                int coreId = i;
-                threads.emplace_back([&]() {
-                    for (uint t = coreId; t < size; t += cores) {
+                uint count = size / (cores - i);
+                size -= count;
+                tasks[i] = (i ? tasks[i - 1] : 0) + count;
+            }
+            for (int i = 0; i < cores; ++i) {
+                uint start = i ? tasks[i - 1] : 0;
+                uint end = tasks[i];
+                threads.emplace_back([&, start, end]() {
+                    for (uint t = start; t < end; ++t) {
                         set_global_id(0, t);
                         func(std::forward<Args &&>(args)...);
                     }
@@ -154,7 +161,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
         std::fill(accumulateFrameBuffer.begin(), accumulateFrameBuffer.end(), 0.0f);
     }
     samples += 1;
-    CPUDispatcher dispatcher{.cores = 1};
+    CPUDispatcher dispatcher{.cores = 48};
     // __global Ray *output,
     // uint width, uint height, ulong globalSeed,
     // float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near

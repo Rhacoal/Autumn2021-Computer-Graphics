@@ -72,7 +72,7 @@ class AppMain : public cg::Application {
     // mouse
     double lastMouseX = .0, lastMouseY = .0;
     double deltaX = .0, deltaY = .0;
-    bool hasMouseMove = false;
+    bool receiveMouseMovement = false;
     bool showCursor = false;
     bool rightButtonClicked = false;
 
@@ -125,8 +125,8 @@ public:
         auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.5f, 20, 20));
         sphere->material()->emission = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
         sphere->material()->color = glm::vec4{1.0f, 0.0f, 0.0f, 0.0f};
-//        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
-        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 20, 20));
+        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
+//        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 20, 20));
         box->setPosition(glm::vec3(3.5f, 0.0f, 0.0f));
         box->material()->emission = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
         box->material()->color = glm::vec4{0.0f, 1.0f, 0.0f, 0.0f};
@@ -148,15 +148,15 @@ public:
         glfwSetCursorPosCallback(window(), [](GLFWwindow *, double mouseX, double mouseY) {
             auto &app = *appMain;
             if (app.showCursor) {
-                app.hasMouseMove = false;
+                app.receiveMouseMovement = false;
                 app.lastMouseX = mouseX;
                 app.lastMouseY = mouseY;
                 return;
             }
-            if (!app.hasMouseMove) {
+            if (!app.receiveMouseMovement) {
                 app.lastMouseX = mouseX;
                 app.lastMouseY = mouseY;
-                app.hasMouseMove = true;
+                app.receiveMouseMovement = true;
             }
             app.deltaX = mouseX - app.lastMouseX;
             app.deltaY = mouseY - app.lastMouseY;
@@ -251,7 +251,7 @@ public:
                     if (!rtRenderer.has_value()) {
                         rtRenderer.emplace();
                     }
-                    rtRenderer->init(640, 360);
+                    rtRenderer->init(320, 180);
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
                     use_ray_tracing = true;
@@ -290,7 +290,6 @@ public:
 
             ImGui::Text("options");
             ImGui::Checkbox("skybox", &use_skybox);
-
 
             ImGui::Text("spp: %d", rtRenderer.has_value() ? rtRenderer.value().sampleCount() : 0);
             ImGui::Text("mouse: (%.2f, %.2f)", lastMouseX, lastMouseY);
@@ -367,7 +366,7 @@ public:
     }
 
     void updateMouse() {
-        if (hasMouseMove && (abs(deltaX) > 1e-2 || abs(deltaY) > 1e-2)) {
+        if (receiveMouseMovement && (abs(deltaX) > 1e-2 || abs(deltaY) > 1e-2)) {
             deltaX /= windowWidth();
             deltaY /= windowHeight();
             const auto up = camera.up(); // +y

@@ -11,7 +11,6 @@
 #include <memory>
 
 namespace cg {
-
 /**
  * Material of an object, including color, textures, shaders and so on.
  */
@@ -85,13 +84,18 @@ public:
     Shader shader;
     std::optional<Texture> albedoMap;
     float albedoIntensity = 1.0f;
+    // metallic map. red channel is used
     std::optional<Texture> metallicMap;
     float metallicIntensity = 1.0f;
+    // roughness map. green channel is used
     std::optional<Texture> roughnessMap;
     float roughnessIntensity = 1.0f;
+    // ambient occlusion map. blue channel is used
     std::optional<Texture> aoMap;
     float aoIntensity = 1.0f;
+    // normal map
     std::optional<Texture> normalMap;
+    // environment map. should have mipmap calculated
     std::optional<CubeTexture> envMap;
 
     StandardMaterial() = default;
