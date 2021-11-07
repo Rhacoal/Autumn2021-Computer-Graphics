@@ -50,8 +50,7 @@ GLuint cg::AxisHelperMaterial::useShaderProgram(Scene &scene, Camera &camera, Pr
     if (axisHelperShader.isNull()) {
         axisHelperShader = Shader(vertex, fragment);
     }
-    axisHelperShader.use();
-    return axisHelperShader.id;
+    return axisHelperShader.use();
 }
 
 cg::AxisHelper::AxisHelper(glm::vec3 x, glm::vec3 y, glm::vec3 z, float lineWidth)

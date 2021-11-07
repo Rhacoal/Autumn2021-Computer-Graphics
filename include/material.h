@@ -27,8 +27,6 @@ public:
 
     Material(Material &&) = delete;
 
-    virtual bool canInstance() const { return false; }
-
     /**
      * Called before switching to this shader program. This method is called only once per frame for all objects sharing
      * this same material.
@@ -45,32 +43,15 @@ public:
     virtual bool isTransparent() const noexcept { return false; };
 };
 
-template<typename T>
-class WeakHolder {
-    static std::weak_ptr<T> weak;
-public:
-    static std::shared_ptr<T> getInstance() {
-        auto ret = weak.lock();
-        if (ret) {
-            return ret;
-        }
-        ret = std::make_shared<T>();
-        weak = ret;
-        return weak.lock();
-    }
-};
-
 class PhongMaterial : public Material {
     typedef std::tuple<int, int> cache_key_t;
     cache_key_t prevKey;
-public:
     Shader shader;
+public:
     std::optional<Texture> diffuse = Texture::defaultTexture(Texture::DefaultTexture::WHITE);
     glm::float32 shininess;
 
     PhongMaterial() : shininess(1.0f) {}
-
-    bool canInstance() const override { return true; }
 
     GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) noexcept override;
 
@@ -80,8 +61,8 @@ public:
 class StandardMaterial : public Material {
     typedef std::tuple<int, int> cache_key_t;
     cache_key_t prevKey;
-public:
     Shader shader;
+public:
     std::optional<Texture> albedoMap;
     float albedoIntensity = 1.0f;
     // metallic map. red channel is used

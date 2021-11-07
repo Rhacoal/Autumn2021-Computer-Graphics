@@ -1,4 +1,5 @@
 #version 330 core
+#include <bsdf.fsh>
 
 // {headers}
 #define RECIPROCAL_PI 0.3183098861837907

@@ -71,22 +71,28 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
     tymin = (bounds[1 - sign[1]].y - ray.origin.y) * inverseRay.y;
     tymax = (bounds[sign[1]].y - ray.origin.y) * inverseRay.y;
 
-    if ((tmin > tymax) || (tymin > tmax))
+    if ((tmin > tymax) || (tymin > tmax)) {
         return false;
-    if (tymin > tmin)
+    }
+    if (tymin > tmin) {
         tmin = tymin;
-    if (tymax < tmax)
+    }
+    if (tymax < tmax) {
         tmax = tymax;
+    }
 
     tzmin = (bounds[1 - sign[2]].z - ray.origin.z) * inverseRay.z;
     tzmax = (bounds[sign[2]].z - ray.origin.z) * inverseRay.z;
 
-    if ((tmin > tzmax) || (tzmin > tmax))
+    if ((tmin > tzmax) || (tzmin > tmax)) {
         return false;
-    if (tzmin > tmin)
+    }
+    if (tzmin > tmin) {
         tmin = tzmin;
-    if (tzmax < tmax)
+    }
+    if (tzmax < tmax) {
         tmax = tzmax;
+    }
 
     return true;
 }
@@ -160,7 +166,7 @@ __kernel void raygeneration_kernel(
     float top = near * tan(fov / 2);
 //    float top = 1.0f / (near * tan(fov));
     float3 near_pos = vec3(ndc_x * top * aspect, ndc_y * top, -near);
-    float3 cameraX = cross(cameraDir, cameraUp);
+    float3 cameraX = normalize(cross(cameraDir, cameraUp));
     float3 cameraY = cross(cameraX, cameraDir);
     float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * (-cameraDir) + cameraPosition;
 
@@ -195,6 +201,9 @@ __kernel void render_kernel(
     ulong seed = pixel_id ^ (globalSeed * pixel_id);
     float3 sum = vec3(0.0);
     float3 color = vec3(0.0);
+    if (pixel_id == width * (height / 2) + width / 2) {
+        debugger;
+    }
 
     // a maximum of 15 bounces is allowed
     struct {
@@ -243,7 +252,7 @@ __kernel void render_kernel(
             // select next position
             float a = randomFloat(&seed), b = randomFloat(&seed);
             float phi = RT_M_PI_F * 20.0f * a, theta = acos(b);
-            float3 temp = w.x > 0.1 ? vec3(0.0f, 1.0f, 0.0f) : vec3(1.0f, 0.0f, 0.0f);
+            float3 temp = fabs(w.x) > 0.1f ? vec3(0.0f, 1.0f, 0.0f) : vec3(1.0f, 0.0f, 0.0f);
 //            if (materials[triangle.mtlIndex].specTrans > 0.01) {
 //                if (randomFloat(&seed) < 0.5) {
 //                    // refraction
@@ -256,8 +265,8 @@ __kernel void render_kernel(
             float3 u = normalize(cross(temp, w));
             float3 v = cross(w, u);
             float3 next = normalize(w * b +
-                          u * sin(theta) * cos(phi) +
-                          v * sin(theta) * sin(phi));
+                                    u * sin(theta) * cos(phi) +
+                                    v * sin(theta) * sin(phi));
             stack[i].wi = next;
             ray.origin = pos + next * 0.001f; // avoid self-intersection
             ray.direction = next;

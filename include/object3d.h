@@ -63,7 +63,7 @@ class Object3D {
 
     // origin in location coordinates
     glm::vec3 _pos{0.0f, 0.0f, 0.0f};
-    glm::quat _quat;
+    glm::quat _quat{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 _scale{1.0f, 1.0f, 1.0f};
 
     glm::vec3 _up{0.0f, 1.0f, 0.0f};

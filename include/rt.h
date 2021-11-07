@@ -83,6 +83,7 @@ class RayTracingRenderer {
     // camera and resampling
     glm::vec3 up, dir, pos;
     int samples = 0;
+    uint spp = 1;
 
     // cpu related buffers
     std::vector<Ray> rayMemBuffer;

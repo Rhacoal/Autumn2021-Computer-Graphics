@@ -46,8 +46,17 @@ constexpr F pi() {
     return F(3.14159265358979323846);
 }
 
+constexpr float radians(float degree) {
+    return degree / 180.f * pi<float>();
+}
+
 constexpr double radians(double degree) {
-    return degree / 180. * pi();
+    return degree / 180. * pi<double>();
+}
+
+template<typename F>
+constexpr double radians(F degree) {
+    return radians(double(degree));
 }
 
 constexpr double half_pi() {

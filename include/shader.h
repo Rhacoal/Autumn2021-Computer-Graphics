@@ -9,11 +9,12 @@
 #include <memory>
 
 namespace cg {
-class Shader {
-public:
-    GLuint id;
+struct ShaderImpl;
 
-    Shader() noexcept;
+class Shader {
+    std::shared_ptr<ShaderImpl> _impl;
+public:
+    Shader();
 
     /**
      * Constructs a shader object using shader source.
@@ -22,39 +23,21 @@ public:
      */
     Shader(const char *vertexShaderSource, const char *fragmentShaderSource);
 
-    Shader(const Shader &) = delete;
+    GLuint use() const;
 
-    Shader(Shader &&) noexcept;
+    GLuint id() const;
 
-    Shader &operator=(Shader &&shader) noexcept;
+    bool isNull() const noexcept;
 
-    void use() const;
+    void setUniform4f(const char *name, const glm::vec4 &value);
 
-    bool isNull() const noexcept {
-        return id == 0;
-    }
+    void setUniform3f(const char *name, const glm::vec3 &value);
 
-    void setUniform4f(const char *name, const glm::vec4 &value) {
-        glUniform4fv(glGetUniformLocation(id, name), 1, &value[0]);
-    }
+    void setUniform1f(const char *name, float value);
 
-    void setUniform3f(const char *name, const glm::vec3 &value) {
-        glUniform3fv(glGetUniformLocation(id, name), 1, &value[0]);
-    }
+    void setUniform1i(const char *name, int value);
 
-    void setUniform1f(const char *name, float value) {
-        glUniform1f(glGetUniformLocation(id, name), value);
-    }
-
-    void setUniform1i(const char *name, int value) {
-        glUniform1i(glGetUniformLocation(id, name), value);
-    }
-
-    void setUniformMatrix4(const char *name, const glm::mat4 &value, bool transpose = false) {
-        glUniformMatrix4fv(glGetUniformLocation(id, name), 1, transpose, &value[0][0]);
-    }
-
-    ~Shader();
+    void setUniformMatrix4(const char *name, const glm::mat4 &value, bool transpose = false);
 };
 
 struct ShaderPassImpl;
@@ -91,7 +74,7 @@ public:
 
     void usePasses(const std::initializer_list<std::pair<bool, ShaderPass *>> &passes) {
         _passes.clear();
-        for (const auto &[enabled, sp] : passes) {
+        for (const auto &[enabled, sp]: passes) {
             if (enabled) {
                 _passes.emplace_back(sp);
             }

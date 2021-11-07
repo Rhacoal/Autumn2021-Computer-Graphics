@@ -3,8 +3,10 @@
 
 #ifdef __cplusplus
 #define CPP_INLINE inline
+#define debugger do {int a = 0;}while(0)
 #else
 #define CPP_INLINE
+#define debugger
 #endif
 
 int next(ulong *, int);

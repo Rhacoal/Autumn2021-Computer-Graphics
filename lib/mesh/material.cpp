@@ -6,10 +6,8 @@
 #include <texture.h>
 
 #include <string>
-#include <sstream>
 #include <utility>
 #include <tuple>
-#include <filesystem>
 #include <fstream>
 
 int cg::Material::latest_id = 1;
@@ -18,7 +16,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
     static std::string phong_vertex = readFile("lib/shaders/phong.vsh");
     static std::string phong_fragment = readFile("lib/shaders/phong.fsh");
     bool _shader_need_update = false;
-    if (!shader.id) {
+    if (shader.isNull()) {
         _shader_need_update = true;
     }
     cache_key_t key = std::make_tuple(pargs.pointLightCount, pargs.directionalLightCount);
@@ -28,7 +26,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
     prevKey = key;
     // if update is needed, recompile a shader
     if (_shader_need_update) {
-        puts(shader.id ? "Recreating phong shader." : "Creating phong shader.");
+        puts(shader.isNull() ? "Recreating phong shader." : "Creating phong shader.");
         std::string vert = phong_vertex;
         std::string frag = phong_fragment;
         const char *header_tag = "// {headers}";
@@ -42,9 +40,8 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
         }
         this->shader = Shader(vert.data(), frag.data());
     }
-    GLuint sp = this->shader.id;
+    GLuint sp = this->shader.use();
     if (sp) {
-        glUseProgram(sp);
         char name[256];
         // TODO cache locations
         for (int i = 0; i < pargs.pointLightCount; ++i) {
@@ -78,7 +75,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
 }
 
 void cg::PhongMaterial::updateUniforms(cg::Object3D *object, Camera &camera) {
-    GLuint sp = shader.id;
+    GLuint sp = shader.id();
     if (!sp) return;
     auto modelMatrix = object->modelMatrix();
     glUniformMatrix4fv(glGetUniformLocation(sp, "modelMatrix"), 1, GL_FALSE, &modelMatrix[0][0]);
@@ -121,7 +118,7 @@ void main() {
 )";
 
 GLuint cg::SkyboxMaterial::useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) noexcept {
-    if (!shader.id) {
+    if (!shader.id()) {
         shader = Shader(skybox_vert, skybox_frag);
     }
     shader.use();
@@ -134,7 +131,7 @@ GLuint cg::SkyboxMaterial::useShaderProgram(Scene &scene, Camera &camera, Progra
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.has_value() ? skybox->tex() : 0);
-    return shader.id;
+    return shader.id();
 }
 
 void cg::SkyboxMaterial::updateUniforms(cg::Object3D *object, cg::Camera &camera) {}

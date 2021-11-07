@@ -168,7 +168,7 @@ public:
 
 class SphereGeometry : public MeshGeometry {
 public:
-    SphereGeometry(float radius, int widthSegments = 20, int heightSegments = 20);
+    explicit SphereGeometry(float radius, int widthSegments = 20, int heightSegments = 20);
 };
 }
 

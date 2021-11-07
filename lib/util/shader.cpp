@@ -1,94 +1,146 @@
 #include <shader.h>
 #include <texture.h>
 
-std::string readFile(const char *path) {
-    std::string ret;
-    char buf[1024];
-    FILE *f = fopen(path, "rb");
-    int n;
-    while ((n = fread(buf, 1, 1024, f))) {
-        ret.insert(ret.back(), buf, n);
-    }
-    return ret;
-}
-
-cg::Shader::Shader() noexcept: id(0) {}
-
-std::string getShaderSource(GLuint shader) {
+namespace cg {
+static std::string getShaderSource(GLuint shader) {
     constexpr size_t buf_size = 1u << 20u;
     static char buf[buf_size];
     glGetShaderSource(shader, buf_size, nullptr, buf);
     return buf;
 }
 
-cg::Shader::Shader(const char *vertexShaderSource, const char *fragmentShaderSource) {
-    // compile vertex shader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
-    glCompileShader(vertexShader);
+struct ShaderImpl {
+    GLuint id;
 
-    // check for compilation errors
-    int success;
-    char infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        fprintf(stderr, "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n%s\n", infoLog);
+    ShaderImpl() noexcept: id(0) {}
+
+    ShaderImpl(const char *vertexShaderSource, const char *fragmentShaderSource) {
+        // compile vertex shader
+        GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
+        glCompileShader(vertexShader);
+
+        // check for compilation errors
+        int success;
+        char infoLog[512];
+        glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
+            fprintf(stderr, "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n%s\n", infoLog);
+        }
+
+        // compile fragment shader
+        GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
+        glCompileShader(fragmentShader);
+        // check for compilation errors
+        glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            glGetShaderInfoLog(fragmentShader, 511, nullptr, infoLog);
+            fprintf(stderr, "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
+        }
+
+        // link program
+        GLuint shaderProgram = glCreateProgram();
+        glAttachShader(shaderProgram, vertexShader);
+        glAttachShader(shaderProgram, fragmentShader);
+        glLinkProgram(shaderProgram);
+
+        // check for linking errors
+        glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+        if (!success) {
+            glGetProgramInfoLog(shaderProgram, 511, nullptr, infoLog);
+            fprintf(stderr, "ERROR::SHADER::PROGRAM::LINKING_FAILED\n%s\n", infoLog);
+            auto vs = getShaderSource(vertexShader);
+            auto fs = getShaderSource(fragmentShader);
+            fprintf(stderr, "Vertex Shader:\n%s\n==========\nFragment Shader:\n%s\n\n", vs.c_str(), fs.c_str());
+            exit(0);
+        }
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+
+        id = shaderProgram;
     }
 
-    // compile fragment shader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
-    glCompileShader(fragmentShader);
-    // check for compilation errors
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        fprintf(stderr, "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
+    ShaderImpl(ShaderImpl &&b) noexcept: id(b.id) {
+        b.id = 0;
     }
 
-    // link program
-    GLuint shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    // check for linking errors
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-        fprintf(stderr, "ERROR::SHADER::PROGRAM::LINKING_FAILED\n%s\n", infoLog);
+    GLuint use() const {
+        glUseProgram(id);
+        return id;
     }
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
 
-    id = shaderProgram;
-}
-
-cg::Shader::Shader(cg::Shader &&b) noexcept: id(b.id) {
-    b.id = 0;
-}
-
-void cg::Shader::use() const {
-    glUseProgram(id);
-}
-
-cg::Shader::~Shader() {
-    if (id) {
-        glDeleteProgram(id);
+    bool isNull() const {
+        return id == 0;
     }
-}
 
-cg::Shader &cg::Shader::operator=(cg::Shader &&shader) noexcept {
-    if (id) {
-        glDeleteProgram(id);
+    void setUniform4f(const char *name, const glm::vec4 &value) {
+        glUniform4fv(glGetUniformLocation(id, name), 1, &value[0]);
     }
-    id = shader.id;
-    shader.id = 0;
-    return *this;
+
+    void setUniform3f(const char *name, const glm::vec3 &value) {
+        glUniform3fv(glGetUniformLocation(id, name), 1, &value[0]);
+    }
+
+    void setUniform1f(const char *name, float value) {
+        glUniform1f(glGetUniformLocation(id, name), value);
+    }
+
+    void setUniform1i(const char *name, int value) {
+        glUniform1i(glGetUniformLocation(id, name), value);
+    }
+
+    void setUniformMatrix4(const char *name, const glm::mat4 &value, bool transpose = false) {
+        glUniformMatrix4fv(glGetUniformLocation(id, name), 1, transpose, &value[0][0]);
+    }
+
+    ~ShaderImpl() {
+        if (id) {
+            glDeleteProgram(id);
+        }
+    }
+};
+
+Shader::Shader() : _impl(std::make_shared<ShaderImpl>()) {}
+
+GLuint Shader::use() const {
+    return _impl->use();
 }
 
-const char *shaderPassVertexShader = R"(
+bool Shader::isNull() const noexcept {
+    return _impl->isNull();
+}
+
+Shader::Shader(const char *vertexShaderSource, const char *fragmentShaderSource)
+    : _impl(std::make_shared<ShaderImpl>(vertexShaderSource, fragmentShaderSource)) {
+}
+
+void Shader::setUniform4f(const char *name, const glm::vec4 &value) {
+    _impl->setUniform4f(name, value);
+}
+
+void Shader::setUniform3f(const char *name, const glm::vec3 &value) {
+    _impl->setUniform3f(name, value);
+}
+
+void Shader::setUniform1f(const char *name, float value) {
+    _impl->setUniform1f(name, value);
+}
+
+void Shader::setUniform1i(const char *name, int value) {
+    _impl->setUniform1i(name, value);
+}
+
+void Shader::setUniformMatrix4(const char *name, const glm::mat4 &value, bool transpose) {
+    _impl->setUniformMatrix4(name, value, transpose);
+}
+
+GLuint Shader::id() const {
+    return _impl->id;
+}
+
+static constexpr const char *shaderPassVertexShader = R"(
 #version 330 core
 
 layout (location = 0) in vec2 inTexCoord;
@@ -101,8 +153,6 @@ void main() {
     gl_Position = vec4(inTexCoord * 2.0 - 1.0, 0.0, 1.0);
 }
 )";
-
-namespace cg {
 
 struct ShaderPassImpl {
     static constexpr float vertices[] = {0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0};
@@ -128,8 +178,8 @@ struct ShaderPassImpl {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-        shader.use();
-        glUniform1i(glGetUniformLocation(shader.id, "screenTexture"), 0);
+        GLuint id = shader.use();
+        glUniform1i(glGetUniformLocation(id, "screenTexture"), 0);
         createFrameBuffer(width, height);
     }
 
@@ -157,7 +207,7 @@ struct ShaderPassImpl {
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
         // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            fputs("ERROR::FRAMEBUFFER:: Framebuffer is not complete!", stderr);
+            fputs("ERROR::FRAMEBUFFER:: Framebuffer is not complete!\n", stderr);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
@@ -216,11 +266,10 @@ struct ShaderPassImpl {
 };
 
 ShaderPassLink::ShaderPassLink(int width, int height) : _width(width), _height(height) {
-
 }
 
 void ShaderPassLink::renderBegin() {
-    for (auto &pass : _passes) {
+    for (auto &pass: _passes) {
         pass->resize(_width, _height);
     }
     if (!_passes.empty()) {

@@ -1,0 +1,111 @@
+{
+  "materials": [
+    {
+      "id": "mtl-ball",
+      "type": "standard",
+      "albedo": {
+        "texture": "material/rustediron2/rustediron2_basecolor.png"
+      },
+      "metallic": {
+        "texture": "material/rustediron2/rustediron2_metallic.png"
+      },
+      "roughness": {
+        "texture": "material/rustediron2/rustediron2_roughness.png"
+      },
+      "normal": {
+        "texture": "material/rustediron2/rustediron2_normal.png"
+      }
+    },
+    {
+      "id": "mtl-ball-phong",
+      "type": "phong",
+      "albedo": {
+        "texture": "material/rustediron2/rustediron2_basecolor.png"
+      }
+    },
+    {
+      "id": "mtl-floor",
+      "type": "standard",
+      "albedo": {
+        "intensity": [0.56, 0.57, 0.58]
+      },
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 0.2
+      }
+    },
+    {
+      "id": "mtl-bunny",
+      "type": "bunny",
+      "albedo": {
+        "intensity": [0.0, 0.0, 0.0, 0.1]
+      }
+    },
+    {
+      "id": "mtl-dragon",
+      "type": "standard",
+      "albedo": {
+        "intensity": [0.56, 0.57, 0.58]
+      },
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 0.01
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "floor",
+      "geometry": {
+        "type": "box",
+        "size": [200.0, 0.1, 200.0]
+      },
+      "position": [0.0, -0.05, 0.0],
+      "rotation": [0.0, 1.0, 1.0, 1.0],
+      "material": "mtl-floor"
+    },
+    {
+      "id": "ball1",
+      "geometry": {
+        "type": "sphere",
+        "radius": 1.0
+      },
+      "position": [3.0, 1.0, -2.0],
+      "rotation": [0.0, 1.0, 1.0, 1.0],
+      "material": "mtl-ball"
+    },
+    {
+      "id": "bunny",
+      "geometry": {
+        "type": "file",
+        "file": "object/bun_zipper_res2.ply",
+        "material": "mtl-bunny"
+      },
+      "position": [-2.0, 0.0, -2.0],
+      "rotation": [0.0, 1.0, 1.0, 1.0],
+      "material": "mtl-box"
+    },
+    {
+      "id": "dragon",
+      "position": [1.0, 0.0, -5.0],
+      "geometry": {
+        "type": "file",
+        "file": "object/dragon_vrip_res2.ply",
+        "material": "mtl-dragon"
+      }
+    },
+    {
+      "id": "light",
+      "isLight": true,
+      "position": [0.0, 5.0, 0.0],
+      "geometry": {
+        "type": "plane",
+        "size": [0.5, 0.5]
+      }
+    }
+  ]
+}

@@ -59,7 +59,12 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         auto modelMatrix = object.modelMatrix();
         const auto transform = [&](auto &&buf, uint v0, uint size) -> float4 {
             return toFloat4(modelMatrix * glm::vec4{
-                buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2], 1.0
+                buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2], 1.0f
+            });
+        };
+        const auto transformNormal = [&](auto &&buf, uint v0, uint size) -> float4 {
+            return toFloat4(modelMatrix * glm::vec4{
+                    buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2], 0.0f
             });
         };
         const auto addTriangle = [&](unsigned int v0, unsigned int v1, unsigned int v2) {
@@ -67,10 +72,12 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
                 .mtlIndex = mtlIndex,
             };
             // position
-            auto[buf, size] = position.value();
-            triangle.v0.position = transform(buf, v0, size);
-            triangle.v1.position = transform(buf, v1, size);
-            triangle.v2.position = transform(buf, v2, size);
+            {
+                auto[buf, size] = position.value();
+                triangle.v0.position = transform(buf, v0, size);
+                triangle.v1.position = transform(buf, v1, size);
+                triangle.v2.position = transform(buf, v2, size);
+            }
             // texcoord
             if (texcoord.has_value()) {
                 auto[buf, size] = texcoord.value();
@@ -81,9 +88,9 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             // normal
             if (normal.has_value()) {
                 auto[buf, size] = normal.value();
-                triangle.v0.normal = float3{buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2]};
-                triangle.v1.normal = float3{buf[v1 * size + 0], buf[v1 * size + 1], buf[v1 * size + 2]};
-                triangle.v2.normal = float3{buf[v2 * size + 0], buf[v2 * size + 1], buf[v2 * size + 2]};
+                triangle.v0.normal = transformNormal(buf, v0, size);
+                triangle.v1.normal = transformNormal(buf, v1, size);
+                triangle.v2.normal = transformNormal(buf, v2, size);
             }
             triangles.emplace_back(triangle);
         };
@@ -161,7 +168,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
         std::fill(accumulateFrameBuffer.begin(), accumulateFrameBuffer.end(), 0.0f);
     }
     samples += 1;
-    CPUDispatcher dispatcher{.cores = 48};
+    CPUDispatcher dispatcher{.cores = 1};
     // __global Ray *output,
     // uint width, uint height, ulong globalSeed,
     // float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near

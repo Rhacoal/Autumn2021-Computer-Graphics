@@ -47,6 +47,7 @@ void main() {
     vec3 result = vec3(0.0);
 
     vec4 diffuseColor = texture(diffuse, vUv);
+    diffuseColor *= color;
     float opacity = diffuseColor.a;
 
     vec3 V = normalize(cameraPosition - worldPosition);
@@ -74,11 +75,11 @@ void main() {
 
         vec3 lightColor = spec * pointLights[i].color +
                           RECIPROCAL_PI * diffuseColor.rgb * pointLights[i].color;
-        result += (spec * pointLights[i].color.rgb * pointLights[i].color.a * power);
+        result += (spec * pointLights[i].color.rgb * power);
         result += lightColor * lambert;
     }
 #endif
-    result.rgb += ambientLight;
+    result.rgb += ambientLight * diffuseColor.rgb;
 
-    fragColor = vec4(result, opacity);// * color;
+    fragColor = vec4(result, opacity);
 }
