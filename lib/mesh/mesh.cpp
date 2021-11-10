@@ -11,7 +11,8 @@ cg::BoundingBox cg::Mesh::computeBoundingBox() const {
     std::optional<BoundingBox> box;
     _geo->traverseVertices([&](float x, float y, float z) {
         glm::vec4 point{x, y, z, 1.0};
-        point = modelMatrix() * point;
+        auto mMatrix = modelMatrix();
+        point = mMatrix * point;
         if (box.has_value()) {
             box->addPoint(glm::vec3(point));
         } else {

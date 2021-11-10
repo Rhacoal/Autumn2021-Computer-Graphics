@@ -88,6 +88,7 @@ public:
         } else {
             _world_matrix = _local_matrix;
         }
+        _need_update = false;
     }
 
     glm::vec3 position() const {
@@ -99,6 +100,16 @@ public:
         invalidateMatrix();
     }
 
+    void applyScale(glm::vec3 scale) {
+        _scale *= scale;
+        invalidateMatrix();
+    }
+
+    void setScale(glm::vec3 scale) {
+        _scale = scale;
+        invalidateMatrix();
+    }
+
     void applyRotation(glm::quat quat) {
         _quat = quat * _quat;
         invalidateMatrix();
@@ -107,7 +118,7 @@ public:
     void invalidateMatrix(bool force = false) {
         if (!_need_update || force) {
             _need_update = true;
-            for (auto *child : _children) {
+            for (auto *child: _children) {
                 child->invalidateMatrix(force);
             }
         }
@@ -115,8 +126,8 @@ public:
 
     void lookAt(glm::vec3 target) {
         glm::vec3 t = target, p = _pos;
-        auto lookAtMat = cg::look_at(_up, t, p);
-        _quat = glm::conjugate(glm::quat_cast(lookAtMat));
+        auto lookAtMat = glm::inverse(cg::look_at(_up, t, p));
+        _quat = glm::quat_cast(lookAtMat);
         invalidateMatrix();
     }
 
@@ -128,11 +139,11 @@ public:
         if (_need_update) {
             updateWorldMatrix();
         }
-        return glm::normalize(glm::vec3(glm::inverse(_local_matrix) * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}));
+        return glm::normalize(glm::vec3(_local_matrix * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}));
     }
 
     glm::vec3 lookDirWorld() const {
-        return glm::normalize(glm::vec3(glm::inverse(worldMatrix()) * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}));
+        return glm::normalize(glm::vec3(worldMatrix() * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}));
     }
 
     glm::vec3 up() const {
@@ -190,7 +201,7 @@ public:
     }
 
     glm::mat4 modelMatrix() const {
-        return glm::inverse(worldMatrix());
+        return worldMatrix();
     }
 
     glm::mat4 parentModelMatrix() const {
@@ -218,13 +229,13 @@ public:
     template<typename T>
     void traverse(T &&func) {
         func(*this);
-        for (auto *child : _children) {
+        for (auto *child: _children) {
             child->traverse(func);
         }
     }
 
     virtual ~Object3D() {
-        for (auto *child : _children) {
+        for (auto *child: _children) {
             delete child;
         }
         _children.clear();

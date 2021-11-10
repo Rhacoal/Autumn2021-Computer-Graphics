@@ -101,12 +101,12 @@ public:
 
         // skybox
         const char *skybox_faces[] = {
-                "assets/skybox/right.jpg",
-                "assets/skybox/left.jpg",
-                "assets/skybox/top.jpg",
-                "assets/skybox/bottom.jpg",
-                "assets/skybox/front.jpg",
-                "assets/skybox/back.jpg",
+            "assets/skybox/right.jpg",
+            "assets/skybox/left.jpg",
+            "assets/skybox/top.jpg",
+            "assets/skybox/bottom.jpg",
+            "assets/skybox/front.jpg",
+            "assets/skybox/back.jpg",
         };
         skybox = new Skybox(skybox_faces);
         currentScene().addChild(skybox);
@@ -122,15 +122,19 @@ public:
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
+
+        // other objects
         auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.5f, 20, 20));
         sphere->material()->emission = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
         sphere->material()->color = glm::vec4{1.0f, 0.0f, 0.0f, 0.0f};
+        sphere->applyScale(glm::vec3(2.0f));
         auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
 //        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 20, 20));
         float rotation = 0.0f;
         box->applyRotation(glm::quat(cos(math::radians(rotation)),
-                glm::vec3(0.0f, 1.0f, 0.0f) * sin(math::radians(rotation))));
+            glm::vec3(0.0f, 1.0f, 0.0f) * static_cast<float>(sin(math::radians(rotation)))));
         box->setPosition(glm::vec3(3.5f, 0.0f, 0.0f));
+        box->applyScale(glm::vec3(0.2f));
         box->material()->emission = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
         box->material()->color = glm::vec4{0.0f, 1.0f, 0.0f, 0.0f};
         auto lightBox = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
@@ -202,9 +206,9 @@ public:
         }
 
         shaderPasses->usePasses({
-                {use_invert, &invert.value()},
-                {use_gray,   &gray.value()},
-                {use_gamma,  &gammaCorrection.value()},
+            {use_invert, &invert.value()},
+            {use_gray,   &gray.value()},
+            {use_gamma,  &gammaCorrection.value()},
         });
 
         shaderPasses->renderBegin();
@@ -284,7 +288,7 @@ public:
                 auto cameraZ = -camera.lookDir();
                 auto world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * cameraZ + camera.position();
                 currentScene().addChild(
-                        new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.05f)));
+                    new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.05f)));
             }
 
             ImGui::Text("filters");
@@ -299,10 +303,10 @@ public:
             ImGui::Text("spp: %d", rtRenderer.has_value() ? rtRenderer.value().sampleCount() : 0);
             ImGui::Text("mouse: (%.2f, %.2f)", lastMouseX, lastMouseY);
             ImGui::Text("average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                    ImGui::GetIO().Framerate);
+                ImGui::GetIO().Framerate);
             ImGui::Text("camera: pos(%.2f, %.2f, %.2f) dir(%.2f, %.2f, %.2f)",
-                    camera.position().x, camera.position().y, camera.position().z,
-                    camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
+                camera.position().x, camera.position().y, camera.position().z,
+                camera.lookDir().x, camera.lookDir().y, camera.lookDir().z);
             ImGui::End();
         }
         ImGui::Render();
@@ -499,10 +503,10 @@ int main(int argc, const char **argv) {
         }
     }
     app.start(cg::ApplicationConfig{
-            .window =  {
-                    .width = 1024, .height = 576,
-                    .title = "Assignment 2"
-            }
+        .window =  {
+            .width = 1024, .height = 576,
+            .title = "Assignment 2"
+        }
     });
     return 0;
 }

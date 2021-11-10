@@ -40,6 +40,10 @@ class MeshGeometry;
 
 class BoxGeometry;
 
+class SphereGeometry;
+
+class PlaneGeometry;
+
 class Mesh;
 
 class Skybox;

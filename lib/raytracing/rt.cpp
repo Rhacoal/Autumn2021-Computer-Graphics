@@ -29,7 +29,7 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         MeshGeometry *geometry = mesh->geometry();
         Material *mtl = mesh->material();
         auto bufInfo = [](
-            const std::optional<const MeshGeometry::Attribute *> &buf) -> std::optional<std::pair<const MeshGeometry::buffer_t, unsigned int>> {
+            const std::optional<const MeshGeometry::Attribute *> &buf) -> std::optional<std::pair<const MeshGeometry::buffer_t, uint32_t>> {
             if (buf.has_value()) {
                 return std::make_optional(std::make_pair(buf.value()->buf, buf.value()->itemSize));
             }
@@ -67,7 +67,7 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
                     buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2], 0.0f
             });
         };
-        const auto addTriangle = [&](unsigned int v0, unsigned int v1, unsigned int v2) {
+        const auto addTriangle = [&](uint32_t v0, uint32_t v1, uint32_t v2) {
             Triangle triangle{
                 .mtlIndex = mtlIndex,
             };
@@ -97,6 +97,9 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         if (geometry->hasIndices()) {
             const auto indices = geometry->getIndices().value();
             for (unsigned int i = 0; i < indices.size() - 2; i += 3) {
+                if (i % 3000 == 0) {
+                    std::cout << std::setw(10) << i << "/" << std::setw(10) << indices.size() << std::endl;
+                }
                 addTriangle(indices[i], indices[i + 1], indices[i + 2]);
             }
         } else {

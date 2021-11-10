@@ -18,6 +18,9 @@ typedef struct RayTracingMaterial {
     float roughness;
     float specTrans;
     float ior;
+    uint metallicMap;
+    uint roughnessMap;
+    uint padding[2];
 } RayTracingMaterial;
 
 typedef struct RayTracingLight {

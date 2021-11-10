@@ -21,7 +21,7 @@ public:
     typedef struct {
         int layoutIndex;
         buffer_t buf;
-        unsigned int itemSize;
+        uint32_t itemSize;
         bool normalized;
     } Attribute;
 
@@ -62,21 +62,21 @@ public:
     }
 
     template<typename ContainerType>
-    void addAttribute(const std::string &name, ContainerType &&container, unsigned int itemSize) {
+    void addAttribute(const std::string &name, ContainerType &&container, uint32_t itemSize) {
         addAttribute(name, std::data(container), std::size(container), itemSize);
     }
 
-    void addAttribute(const std::string &name, const float *array, size_t array_size, unsigned int itemSize) {
+    void addAttribute(const std::string &name, const float *array, size_t array_size, uint32_t itemSize) {
         attribs.emplace(name, Attribute{-1, buffer_t(array, array + array_size), itemSize, false});
         _invalidate_vbo();
     }
 
     template<typename ContainerType>
-    void addIndices(const std::string &name, ContainerType &&container) {
-        addIndices(name, std::data(container), std::size(container));
+    void addIndices(ContainerType &&container) {
+        addIndices(std::data(container), std::size(container));
     }
 
-    void addIndices(const unsigned int *array, size_t arrayLength) {
+    void addIndices(const uint32_t *array, size_t arrayLength) {
         if (!array) {
             indices.reset();
             _invalidate_ebo();
@@ -95,7 +95,7 @@ public:
         return indices.has_value();
     }
 
-    const std::optional<std::vector<unsigned int>> &getIndices() const noexcept {
+    const std::optional<std::vector<uint32_t>> &getIndices() const noexcept {
         return indices;
     }
 
@@ -123,7 +123,7 @@ protected:
     GLuint vao{}, vbo{}, ebo{};
     std::map<std::string, Attribute> attribs;
     std::vector<GLuint> _used_positions;
-    std::optional<std::vector<unsigned int>> indices;
+    std::optional<std::vector<uint32_t>> indices;
     GLuint prev_shaderProgram = 0;
     bool _need_update = true;
     bool _need_re_layout = true;
@@ -146,11 +146,11 @@ public:
         if (it == attribs.end()) return;
         const auto &pos = it->second.buf;
         if (indices.has_value()) {
-            for (unsigned int pi : *indices) {
+            for (uint32_t pi : *indices) {
                 func(pos[pi * 3], pos[pi * 3 + 1], pos[pi * 3 + 2]);
             }
         } else {
-            for (unsigned int i = 0; i + 2 < pos.size(); i += 3) {
+            for (size_t i = 0; i + 2 < pos.size(); i += 3) {
                 func(pos[i], pos[i + 1], pos[i + 2]);
             }
         }
@@ -169,6 +169,17 @@ public:
 class SphereGeometry : public MeshGeometry {
 public:
     explicit SphereGeometry(float radius, int widthSegments = 20, int heightSegments = 20);
+};
+
+class PlaneGeometry : public MeshGeometry {
+public:
+    /**
+     * Generates a plane xOz facing towards positive-y.
+     * @param sizeX
+     * @param sizeZ
+     * @param side
+     */
+    PlaneGeometry(float sizeX, float sizeZ, Side side = Side::FrontSide);
 };
 }
 

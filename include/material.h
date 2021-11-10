@@ -64,7 +64,7 @@ class StandardMaterial : public Material {
     Shader shader;
 public:
     std::optional<Texture> albedoMap;
-    float albedoIntensity = 1.0f;
+    glm::vec4 albedoIntensity{1.0f};
     // metallic map. red channel is used
     std::optional<Texture> metallicMap;
     float metallicIntensity = 1.0f;

@@ -28,15 +28,15 @@ uniform vec3 ambientLight;
 uniform mat4 modelMatrix, mvpMatrix;
 uniform vec3 cameraPosition;
 
-uniform sampler2D albedo;
-uniform sampler2D metallic;
-uniform float metallicIntensity;
-uniform sampler2D roughness;
-uniform float roughnessIntensity;
-uniform sampler2D ao;
-uniform float aoIntensity;
-uniform sampler2D normal;
+uniform sampler2D albedoMap;
 uniform vec4 color;
+uniform sampler2D metallicMap;
+uniform float metallicIntensity;
+uniform sampler2D roughnessMap;
+uniform float roughnessIntensity;
+uniform sampler2D aoMap;
+uniform float aoIntensity;
+uniform sampler2D normalMap;
 
 in vec2 vUv;
 in vec3 worldPosition;
@@ -51,39 +51,36 @@ float rand(vec2 co){
 void main() {
     vec3 result = vec3(0.0);
 
-    vec4 diffuseColor = texture(diffuse, vUv);
-    float opacity = diffuseColor.a;
+    vec4 albedoColor = texture(albedoMap, vUv);
+    vec3 baseColor = albedoColor.rgb * color.rgb;
+    float opacity = albedoColor.a * color.a;
+    float metallic = texture(metallicMap, vUv).r * metallicIntensity;
+    float roughness = texture(roughnessMap, vUv).g * roughnessIntensity;
+    float ao = texture(aoMap, vUv).b * aoIntensity;
 
     vec3 V = normalize(cameraPosition - worldPosition);
     vec3 N = normalize(vNormal);
 
-    #if DIRECTIONAL
+#if DIRECTIONAL
     {
         vec3 L = normalize(directionalLight.direction);
         vec3 H = normalize(L + V);
-        float lambert = clamp(dot(N, L), 0.0, 1.0);
+        vec3 brdf = DisneyBRDF(L, V, N, baseColor.rgb, 0.0f, metallic, 0.5f, 0.0f, roughness);
 
-        float spec = pow(clamp(dot(N, H), 0.0, 1.0), shininess);
-        vec3 lightColor = spec * directionalLight.color +
-        RECIPROCAL_PI * diffuseColor.rgb * directionalLight.color;
-        result += lightColor * lambert;
+        result += directionalLight.color * brdf;
     }
-        #endif
-        #if POINT_LIGHT_COUNT
+#endif
+#if POINT_LIGHT_COUNT
     for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
         vec3 lightVec = pointLights[i].position - worldPosition;
-        vec3 L = normalize(lightVec);
+        vec3 L = normalize(directionalLight.direction);
         vec3 H = normalize(L + V);
-        float lambert = clamp(dot(N, L), 0.0, 1.0);
-        float spec = pow(clamp(dot(N, H), 0.0, 1.0), shininess) / dot(lightVec, lightVec);
+        vec3 brdf = DisneyBRDF(L, V, N, baseColor.rgb, 0.0f, metallic, 0.5f, 0.0f, roughness);
 
-        vec3 lightColor = spec * pointLights[i].color +
-        RECIPROCAL_PI * diffuseColor.rgb * pointLights[i].color;
-        result += (spec * pointLights[i].color.rgb * pointLights[i].color.a * power);
-        result += lightColor * lambert;
+        result += pointLights[i].color * brdf / length(lightVec);
     }
-        #endif
-    result.rgb += ambientLight;
+#endif
+    result.rgb += ambientLight * mix(vec3(0.04f), baseColor.rgb, metallic);
 
-    fragColor = vec4(result, opacity) * color;
+    fragColor = vec4(result, opacity);
 }

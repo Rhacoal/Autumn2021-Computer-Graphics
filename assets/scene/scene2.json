@@ -27,20 +27,30 @@
       "id": "mtl-floor",
       "type": "standard",
       "albedo": {
-        "intensity": [0.56, 0.57, 0.58]
+        "color": [0.1332085131842997, 0.0004925037871914326, 0.17677432164090326]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 1.0
+      }
+    },
+    {
+      "id": "mtl-bunny",
+      "type": "standard",
+      "albedo": {
+        "intensity": [0.0, 0.0, 0.0, 0.1]
       },
       "metallic": {
         "intensity": 1.0
       },
       "roughness": {
-        "intensity": 0.2
-      }
-    },
-    {
-      "id": "mtl-bunny",
-      "type": "bunny",
-      "albedo": {
-        "intensity": [0.0, 0.0, 0.0, 0.1]
+        "intensity": 0.1
+      },
+      "physical": {
+        "ior": 1.5,
+        "transmittance": 0.4
       }
     },
     {
@@ -55,6 +65,11 @@
       "roughness": {
         "intensity": 0.01
       }
+    },
+    {
+      "id": "mtl-light",
+      "type": "standard",
+      "emission": [1.0, 1.0, 1.0]
     }
   ],
   "objects": [
@@ -64,8 +79,7 @@
         "type": "box",
         "size": [200.0, 0.1, 200.0]
       },
-      "position": [0.0, -0.05, 0.0],
-      "rotation": [0.0, 1.0, 1.0, 1.0],
+      "position": [0.0, -5.05, 0.0],
       "material": "mtl-floor"
     },
     {
@@ -75,28 +89,27 @@
         "radius": 1.0
       },
       "position": [3.0, 1.0, -2.0],
-      "rotation": [0.0, 1.0, 1.0, 1.0],
       "material": "mtl-ball"
     },
     {
       "id": "bunny",
       "geometry": {
         "type": "file",
-        "file": "object/bun_zipper_res2.ply",
-        "material": "mtl-bunny"
+        "file": "object/bun_zipper_res2.ply"
       },
       "position": [-2.0, 0.0, -2.0],
-      "rotation": [0.0, 1.0, 1.0, 1.0],
-      "material": "mtl-box"
+      "scale": [10.0, 10.0, 10.0],
+      "material": "mtl-bunny"
     },
     {
       "id": "dragon",
-      "position": [1.0, 0.0, -5.0],
       "geometry": {
         "type": "file",
-        "file": "object/dragon_vrip_res2.ply",
-        "material": "mtl-dragon"
-      }
+        "file": "object/dragon_vrip_res4.ply"
+      },
+      "position": [1.0, 0.0, -5.0],
+      "scale": [10.0, 10.0, 10.0],
+      "material": "mtl-dragon"
     },
     {
       "id": "light",
@@ -105,7 +118,8 @@
       "geometry": {
         "type": "plane",
         "size": [0.5, 0.5]
-      }
+      },
+      "material": "mtl-light"
     }
   ]
 }

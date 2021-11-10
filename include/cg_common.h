@@ -95,5 +95,10 @@ inline std::string readFile(const char *path) {
     std::ifstream in(fspath, std::ios::in | std::ios::binary);
     return std::string{std::istreambuf_iterator<char>(in), {}};
 }
+
+inline std::string readFile(const std::filesystem::path &fspath) {
+    std::ifstream in(fspath, std::ios::in | std::ios::binary);
+    return std::string{std::istreambuf_iterator<char>(in), {}};
+}
 }
 #endif //ASSIGNMENT_CG_COMMON_H

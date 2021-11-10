@@ -69,13 +69,13 @@ cg::Texture cg::Application::loadTexture(const char *path, Texture::Encoding enc
     int width, height, nrChannels;
     unsigned char *data = stbi_load(path, &width, &height, &nrChannels, STBI_rgb_alpha);
     if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(encoding), width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(encoding), width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
         stbi_image_free(data);
     } else {
         // fail silently
-        fprintf(stderr, "failed to load texture %s\n", path);
+        fprintf(stderr, "Failed to load texture %s\n", path);
     }
     return Texture(tex);
 }

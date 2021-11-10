@@ -16,7 +16,7 @@ void cg::decompose(const glm::mat4 &mat, glm::vec3 &position, glm::quat &quat, g
     if (det < 0) sx = -sx;
     scale = glm::vec3(sx, sy, sz);
 
-    position = -glm::vec3(mat[3]);
+    position = glm::vec3(mat[3]);
 
     // scale the rotation part
     glm::mat3 rotation = glm::mat3{
@@ -25,12 +25,12 @@ void cg::decompose(const glm::mat4 &mat, glm::vec3 &position, glm::quat &quat, g
         glm::vec3(mat[2]) / sz,
     };
 
-    quat = glm::conjugate(glm::quat_cast(rotation));
+    quat = glm::quat_cast(rotation);
 }
 
 void cg::compose(glm::mat4 &mat, const glm::vec3 &position, const glm::quat &quat, const glm::vec3 &scale) {
-    auto rot = glm::mat4_cast(glm::conjugate(quat));
-    mat = glm::scale(glm::translate(rot, -position), scale);
+    auto rot = glm::mat4_cast(quat);
+    mat = glm::translate(glm::mat4{1.0f}, position) * rot * glm::scale(glm::mat4{1.0f}, scale);
 }
 
 bool cg::BoundingBox::intersect(const BoundingBox &b) const {

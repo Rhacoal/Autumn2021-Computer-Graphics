@@ -214,3 +214,22 @@ cg::SphereGeometry::SphereGeometry(float radius, int widthSegments, int heightSe
     addAttribute("texcoord", texcoord.data(), texcoord.size(), 2);
     addIndices(indices.data(), indices.size());
 }
+
+cg::PlaneGeometry::PlaneGeometry(float sizeX, float sizeZ, Side side) {
+    float positions[12];
+    float normals[12];
+    unsigned int indices[6 * 2];
+    constexpr int x = 0, y = 1, z = 2;
+    int index0 = 0;
+    float sizes[] = {sizeX, 0, sizeZ};
+    float *ptr_pos = positions, *ptr_norm = normals;
+    unsigned int *ptr_idx = indices;
+    createPlane<z, x, y, +1>(ptr_pos, ptr_norm, ptr_idx, index0, sizes, side != Side::BackSide, side != Side::FrontSide);
+    addAttribute("position", positions, 3);
+    addAttribute("normal", normals, 3);
+    if (side == Side::DoubleSide) {
+        addIndices(indices, 12);
+    } else {
+        addIndices(indices, 6);
+    }
+}

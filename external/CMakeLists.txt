@@ -49,9 +49,9 @@ add_library(tinydialog tinydialog-3.8.8/tinyfiledialogs.cpp tinydialog-3.8.8/tin
 target_include_directories(tinydialog PUBLIC tinydialog-3.8.8)
 
 # Compile AssImp
-#set(BUILD_SHARED_LIBS ON)
-#set(ASSIMP_NO_EXPORT ON)
-#set(ASSIMP_BUILD_TESTS OFF)
-#set(ASSIMP_BUILD_SAMPLES OFF)
-#set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
-#add_subdirectory(assimp-5.0.1)
+set(BUILD_SHARED_LIBS OFF)
+set(ASSIMP_NO_EXPORT ON)
+set(ASSIMP_BUILD_TESTS OFF)
+set(ASSIMP_BUILD_SAMPLES OFF)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
+add_subdirectory(assimp-5.0.1)

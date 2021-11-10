@@ -25,7 +25,7 @@ public:
     }
 
     virtual glm::mat4 viewMatrix() const {
-        return worldMatrix();
+        return glm::inverse(worldMatrix());
     }
 };
 

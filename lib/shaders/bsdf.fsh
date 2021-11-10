@@ -1,3 +1,6 @@
+#define RT_M_PI_F           3.14159274101257f
+#define RT_M_1_PI_F         0.31830987334251f
+
 float sqr(float x) {
     return x * x;
 }
