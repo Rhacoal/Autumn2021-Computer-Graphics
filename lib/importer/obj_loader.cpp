@@ -102,7 +102,7 @@ struct ObjLoader {
 
         auto fspath = rootPath / path;
         const aiScene *scene = importer.ReadFile(fspath.string(),
-            aiProcess_GenSmoothNormals |
+            aiProcess_GenNormals |
             aiProcess_CalcTangentSpace |
             aiProcess_Triangulate |
             aiProcess_SortByPType);
@@ -246,6 +246,7 @@ struct ObjLoader {
             auto normal = loadTexture<float>("normal", "intensity", j,
                 Texture::Encoding::LINEAR, Texture::DefaultTexture::DEFAULT_NORMAL);
             stdMtl->normalMap = normal.first;
+            stdMtl->emission = getOrDefault(j, "emission", glm::vec3(0.0f));
             return stdMtl;
         } else if (type == "phong") {
             auto phongMtl = new PhongMaterial;
@@ -254,6 +255,7 @@ struct ObjLoader {
             phongMtl->diffuse = albedo.first;
             phongMtl->color = albedo.second;
             phongMtl->shininess = getOrDefault(j, "shiniess", 1.0f);
+            phongMtl->emission = getOrDefault(j, "emission", glm::vec3(0.0f));
             return phongMtl;
         }
         return nullptr;

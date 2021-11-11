@@ -11,7 +11,6 @@
 
 #include <vector>
 #include <iostream>
-#include <sstream>
 #include <algorithm>
 #include <functional>
 #include <random>
@@ -29,11 +28,13 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         MeshGeometry *geometry = mesh->geometry();
         Material *mtl = mesh->material();
         auto bufInfo = [](
-            const std::optional<const MeshGeometry::Attribute *> &buf) -> std::optional<std::pair<const MeshGeometry::buffer_t, uint32_t>> {
+            const std::optional<const MeshGeometry::Attribute *> &buf) -> std::optional<std::pair<std::reference_wrapper<const MeshGeometry::buffer_t>, uint32_t>> {
             if (buf.has_value()) {
-                return std::make_optional(std::make_pair(buf.value()->buf, buf.value()->itemSize));
+                return std::make_optional(
+                    std::make_pair(std::reference_wrapper<const MeshGeometry::buffer_t>(buf.value()->buf),
+                        buf.value()->itemSize));
             }
-            return {};
+            return std::nullopt;
         };
         uint mtlIndex;
         auto mtlIt = mtlMap.find(mtl);
@@ -42,9 +43,9 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         } else {
             auto rtMtl = RayTracingMaterial{
                 .albedo = toFloat4(mtl->color),
-                .emission = toFloat4(mtl->emission),
-                .metallic = 0.1f,
-                .roughness = 0.1f,
+                .emission = toFloat3(mtl->emission),
+                .metallic = 0.3f,
+                .roughness = 0.2f,
                 .specTrans = 0.0f,
                 .ior = 1.35f,
             };
@@ -59,12 +60,12 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         auto modelMatrix = object.modelMatrix();
         const auto transform = [&](auto &&buf, uint v0, uint size) -> float4 {
             return toFloat4(modelMatrix * glm::vec4{
-                buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2], 1.0f
+                buf.get()[v0 * size + 0], buf.get()[v0 * size + 1], buf.get()[v0 * size + 2], 1.0f
             });
         };
         const auto transformNormal = [&](auto &&buf, uint v0, uint size) -> float4 {
             return toFloat4(modelMatrix * glm::vec4{
-                    buf[v0 * size + 0], buf[v0 * size + 1], buf[v0 * size + 2], 0.0f
+                buf.get()[v0 * size + 0], buf.get()[v0 * size + 1], buf.get()[v0 * size + 2], 0.0f
             });
         };
         const auto addTriangle = [&](uint32_t v0, uint32_t v1, uint32_t v2) {
@@ -73,21 +74,21 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             };
             // position
             {
-                auto[buf, size] = position.value();
+                auto&[buf, size] = position.value();
                 triangle.v0.position = transform(buf, v0, size);
                 triangle.v1.position = transform(buf, v1, size);
                 triangle.v2.position = transform(buf, v2, size);
             }
             // texcoord
             if (texcoord.has_value()) {
-                auto[buf, size] = texcoord.value();
-                triangle.v0.texcoord = float2{buf[v0 * size + 0], buf[v0 * size + 1]};
-                triangle.v1.texcoord = float2{buf[v1 * size + 0], buf[v1 * size + 1]};
-                triangle.v2.texcoord = float2{buf[v2 * size + 0], buf[v2 * size + 1]};
+                auto&[buf, size] = texcoord.value();
+                triangle.v0.texcoord = float2{buf.get()[v0 * size + 0], buf.get()[v0 * size + 1]};
+                triangle.v1.texcoord = float2{buf.get()[v1 * size + 0], buf.get()[v1 * size + 1]};
+                triangle.v2.texcoord = float2{buf.get()[v2 * size + 0], buf.get()[v2 * size + 1]};
             }
             // normal
             if (normal.has_value()) {
-                auto[buf, size] = normal.value();
+                auto&[buf, size] = normal.value();
                 triangle.v0.normal = transformNormal(buf, v0, size);
                 triangle.v1.normal = transformNormal(buf, v1, size);
                 triangle.v2.normal = transformNormal(buf, v2, size);
@@ -95,7 +96,7 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             triangles.emplace_back(triangle);
         };
         if (geometry->hasIndices()) {
-            const auto indices = geometry->getIndices().value();
+            const auto &indices = geometry->getIndices().value();
             for (unsigned int i = 0; i < indices.size() - 2; i += 3) {
                 if (i % 3000 == 0) {
                     std::cout << std::setw(10) << i << "/" << std::setw(10) << indices.size() << std::endl;
@@ -103,20 +104,33 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
                 addTriangle(indices[i], indices[i + 1], indices[i + 2]);
             }
         } else {
-            const size_t vertices = position.value().first.size();
+            const size_t vertices = position.value().first.get().size();
             for (size_t i = 0; i < vertices - 2; i += 3) {
                 addTriangle(i, i + 1, i + 2);
             }
         }
     });
-    // prevent empty buffers
+    std::vector<int> isLight;
+    for (auto &material: materials) {
+        isLight.emplace_back(material.emission.x + material.emission.y + material.emission.z > 1e-5f);
+    }
+    bvh.buildFromTriangles(triangles);
+    // gather lighting triangles here since triangles might have been reordered
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        if (isLight[triangles[i].mtlIndex]) {
+            lights.push_back(i);
+        }
+    }
+    // prevent empty buffers, or opencl would be angry
     if (triangles.empty()) {
         triangles.emplace_back();
     }
     if (materials.empty()) {
         materials.emplace_back();
     }
-    bvh.buildFromTriangles(triangles);
+    if (lights.empty()) {
+        lights.emplace_back();
+    }
 }
 
 struct CPUDispatcher {
@@ -147,7 +161,7 @@ struct CPUDispatcher {
                     }
                 });
             }
-            for (auto &thread : threads) {
+            for (auto &thread: threads) {
                 thread.join();
             }
         }
@@ -171,25 +185,27 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
         std::fill(accumulateFrameBuffer.begin(), accumulateFrameBuffer.end(), 0.0f);
     }
     samples += 1;
-    CPUDispatcher dispatcher{.cores = 1};
+    CPUDispatcher dispatcher{.cores = 24};
     // __global Ray *output,
     // uint width, uint height, ulong globalSeed,
     // float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
     PerspectiveCamera *perspectiveCamera = camera.isPerspectiveCamera();
 
     dispatcher.dispatch(_width * _height, raygeneration_kernel,
-        rayMemBuffer.data(), _width, _height, std::uniform_int_distribution<ulong>()(engine),
+        rayMemBuffer.data(), _width, _height, seedMemBuffer.data(),
         toFloat3(camera.position()), toFloat3(camera.lookDir()), toFloat3(camera.up()),
         perspectiveCamera->fov() / 180.f * math::pi<float>(), perspectiveCamera->near());
     // __global float4 *output, uint width, uint height,
     // __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
+    // __global uint *lights, uint lightCount,
     // __global Ray *rays, uint bounces,
     // ulong globalSeed, uint spp
     dispatcher.dispatch(_width * _height, render_kernel,
         reinterpret_cast<float4 *>(accumulateFrameBuffer.data()), _width, _height,
         bvhMemBuffer, triangleMemBuffer, materialMemBuffer,
-        rayMemBuffer.data(), 2,
-        std::uniform_int_distribution<ulong>()(engine), 1
+        scene.lights.data(), scene.lights.size(),
+        rayMemBuffer.data(), bounces,
+        seedMemBuffer.data(), 1
     );
     CPUDispatcher{.cores = 1}.dispatch(_width * _height * 4, [&]() {
         uint id = get_global_id(0);
@@ -211,6 +227,8 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         // scene.materials.size() * sizeof(RayTracingMaterial), scene.materials.data(), &err);
         bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
             scene.bvh.nodes.size() * sizeof(BVHNode), scene.bvh.nodes.data(), &err);
+        lightBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            scene.lights.size() * sizeof(uint), scene.lights.data(), &err);
 
         // __global Ray *output,
         rayGenerationKernel.setArg(0, rayBuffer());
@@ -218,7 +236,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         rayGenerationKernel.setArg(1, _width);
         rayGenerationKernel.setArg(2, _height);
         // ulong globalSeed,
-        rayGenerationKernel.setArg(3, std::uniform_int_distribution<ulong>{}(engine));
+        rayGenerationKernel.setArg(3, seedBuffer());
 
         // __global float4 *output, uint width, uint height,
         renderKernel.setArg(0, accumulateBuffer());
@@ -228,12 +246,15 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         renderKernel.setArg(3, bvhBuffer());
         renderKernel.setArg(4, triangleBuffer());
         renderKernel.setArg(5, materialBuffer());
+        // __global uint *lights, uint lightCount,
+        renderKernel.setArg(6, lightBuffer());
+        renderKernel.setArg(7, static_cast<uint>(scene.lights.size()));
         // __global Ray *rays, uint bounces,
-        renderKernel.setArg(6, rayBuffer());
-        renderKernel.setArg(7, bounces);
+        renderKernel.setArg(8, rayBuffer());
+        renderKernel.setArg(9, bounces);
         // ulong globalSeed, uint spp
-        renderKernel.setArg(8, std::uniform_int_distribution<ulong>{}(engine));
-        renderKernel.setArg(9, uint(1));
+        renderKernel.setArg(10, seedBuffer());
+        renderKernel.setArg(11, uint(1));
 
         // __global float4 *output, uint width, uint height
         clearKernel.setArg(0, accumulateBuffer());
@@ -259,11 +280,14 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     }
     // resample
     bool needClear = false;
-    if (camera.up() != up || camera.lookDir() != dir || camera.position() != pos) {
+    auto newUp = camera.up();
+    auto newDir = camera.lookDir();
+    auto newPos = camera.position();
+    if (glm::length(newUp - up) > 1e-5 || glm::length(newDir - dir) > 1e-5 || glm::length(newPos - pos) > 1e-5) {
         needClear = true;
-        up = camera.up();
-        dir = camera.lookDir();
-        pos = camera.position();
+        up = newUp;
+        dir = newDir;
+        pos = newPos;
         samples = 0;
     }
     samples += 1;
@@ -274,10 +298,6 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // float fov, float near
     rayGenerationKernel.setArg(7, (perspective->fov() / 180.f * math::pi<float>()));
     rayGenerationKernel.setArg(8, perspective->near());
-
-    // random seed
-    rayGenerationKernel.setArg(3, std::uniform_int_distribution<ulong>{}(engine));
-    renderKernel.setArg(8, std::uniform_int_distribution<ulong>{}(engine));
 
     // spp
     accumulateKernel.setArg(3, static_cast<uint>(samples));
@@ -409,9 +429,15 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         // prepare buffers
         frameBuffer.resize(_width * _height * 4);
         std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
+        seedMemBuffer.resize(_width * _height * 4);
+        std::uniform_int_distribution<ulong> distribution;
+        for (ulong &ul : seedMemBuffer) {
+            ul = distribution(engine);
+        }
 
         int err;
         rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr, &err);
+        seedBuffer = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, width * height * sizeof(ulong), seedMemBuffer.data(), &err);;
         outputBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr, &err);
         accumulateBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr, &err);
         sceneBufferNeedUpdate = true;
@@ -499,6 +525,11 @@ uint recur(std::vector<BVHNode> &nodes, std::vector<Triangle>::iterator first, s
 
 void cg::BVH::buildFromTriangles(std::vector<Triangle> &triangles) {
     nodes.clear();
+    // prevent empty buffer
+    if (triangles.empty()) {
+        nodes.emplace_back();
+        return;
+    }
     recur(nodes, triangles.begin(), triangles.end(), 0u);
 }
 

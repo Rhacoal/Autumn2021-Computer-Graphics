@@ -26,7 +26,7 @@ struct RayTracingScene {
     std::vector<Texture> usedTextures;
     std::vector<Triangle> triangles;
     std::vector<RayTracingMaterial> materials;
-    std::vector<RayTracingLight> lights;
+    std::vector<uint> lights;
 
     void setFromScene(Scene &scene);
 };
@@ -67,6 +67,7 @@ class RayTracingRenderer {
 
     uint _width{}, _height{};
     cl::Buffer rayBuffer;
+    cl::Buffer seedBuffer;
     cl::Buffer accumulateBuffer;
     cl::Buffer outputBuffer;
 
@@ -87,6 +88,7 @@ class RayTracingRenderer {
 
     // cpu related buffers
     std::vector<Ray> rayMemBuffer;
+    std::vector<ulong> seedMemBuffer;
 
     // random generator
     std::random_device r{};

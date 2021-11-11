@@ -9,23 +9,31 @@
 #define debugger
 #endif
 
-int next(ulong *, int);
+uint next(ulong *, int);
 
 float randomFloat(ulong *);
 
 float pow2(float v);
 
-CPP_INLINE int next(ulong *seed, int bits) {
+CPP_INLINE uint next(ulong *seed, int bits) {
     *seed = (*seed * 0x5DEECE66DL + 0xBL) & (((ulong) 1ul << 48) - 1);
-    return (int) (*seed >> (48 - bits));
+    return (uint) (*seed >> (48 - bits));
 }
 
 CPP_INLINE float randomFloat(ulong *seed) {
     return (float) next(seed, 24) / (float) (1 << 24);
 }
 
+CPP_INLINE uint randomInt(ulong *seed, uint upper) {
+    return next(seed, 32) % upper;
+}
+
 CPP_INLINE float pow2(float v) {
     return v * v;
+}
+
+CPP_INLINE uint pow3i(uint p) {
+    return p * p * p;
 }
 
 CPP_INLINE float pow5(float v) {

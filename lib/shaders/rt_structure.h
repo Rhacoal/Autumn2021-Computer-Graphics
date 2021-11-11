@@ -23,10 +23,6 @@ typedef struct RayTracingMaterial {
     uint padding[2];
 } RayTracingMaterial;
 
-typedef struct RayTracingLight {
-    float4 color;
-} RayTracingLight;
-
 typedef struct Vertex {
     float3 position;
     float3 normal;
@@ -48,7 +44,7 @@ typedef struct Bounds3 {
 #ifdef __cplusplus
 
     static constexpr auto MIN_FLOAT = std::numeric_limits<float>::min();
-    static constexpr auto MAX_FLOAT = std::numeric_limits<float>::min();
+    static constexpr auto MAX_FLOAT = std::numeric_limits<float>::max();
 
     Bounds3() : pMin{MAX_FLOAT, MAX_FLOAT, MAX_FLOAT}, pMax{MIN_FLOAT, MIN_FLOAT, MIN_FLOAT} {}
 

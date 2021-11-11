@@ -87,7 +87,7 @@ public:
 
     AppMain() : camera(45, .1, 500, 16 / 9.f) {
         if (appMain) {
-            throw std::runtime_error("this application should be run in singleton mode!");
+            throw std::runtime_error("this application should be run in std::singleton mode!");
         }
         appMain = this;
     }
@@ -122,32 +122,6 @@ public:
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
-
-        // other objects
-        auto sphere = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.5f, 20, 20));
-        sphere->material()->emission = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
-        sphere->material()->color = glm::vec4{1.0f, 0.0f, 0.0f, 0.0f};
-        sphere->applyScale(glm::vec3(2.0f));
-        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
-//        auto box = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(1.0f, 20, 20));
-        float rotation = 0.0f;
-        box->applyRotation(glm::quat(cos(math::radians(rotation)),
-            glm::vec3(0.0f, 1.0f, 0.0f) * static_cast<float>(sin(math::radians(rotation)))));
-        box->setPosition(glm::vec3(3.5f, 0.0f, 0.0f));
-        box->applyScale(glm::vec3(0.2f));
-        box->material()->emission = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
-        box->material()->color = glm::vec4{0.0f, 1.0f, 0.0f, 0.0f};
-        auto lightBox = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(1.0f, 1.0f, 1.0f));
-        lightBox->setPosition(glm::vec3(0.75f, 0.0f, -1.5f));
-        lightBox->material()->emission = glm::vec4{2.0f, 5.0f, 2.0f, 0.0f};
-        lightBox->material()->color = glm::vec4{1.0f, 1.0f, 1.0f, 0.0f};
-//        auto bigBox = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(20.0f, 20.0f, 20.0f));
-        auto floor = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(2000.0f, 2.0f, 2000.0f));
-        floor->setPosition(glm::vec3(0.0f, -5.0f, 0.0f));
-        currentScene().addChild(sphere);
-        currentScene().addChild(box);
-        currentScene().addChild(lightBox);
-//        currentScene().addChild(bigBox);
 
         // axis helper
         currentScene().addChild(new AxisHelper({1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 5));
@@ -234,7 +208,8 @@ public:
             ImGui::Begin("Assignment 3");
             if (ImGui::Button("load scene...")) {
                 static constexpr const char *filter[] = {"*.json"};
-                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
+//                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
+                const char *path = "assets/scene/scene.json";
                 if (path) {
                     auto obj = loadJsonScene(path);
                     if (!obj) {
@@ -260,7 +235,7 @@ public:
                     if (!rtRenderer.has_value()) {
                         rtRenderer.emplace();
                     }
-                    rtRenderer->init(640, 360);
+                    rtRenderer->init(480, 270);
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
                     use_ray_tracing = true;
@@ -332,7 +307,7 @@ public:
         constexpr float cameraPitchSpeed = math::radians(-1);
         constexpr float cameraYawSpeed = math::radians(2);
         constexpr float cameraMinPitch = math::radians(10), cameraMaxPitch = math::radians(170);
-        float pitch = acos(glm::dot(up, glm::normalize(dir))); // [0, 180)
+        float pitch = std::acos(glm::dot(up, glm::normalize(dir))); // [0, 180)
         const auto projection = cameraToWorld * (dir - glm::dot(dir, up) * up);
         float yaw = atan2(projection.z, projection.x);
         if (glfwGetKey(window(), GLFW_KEY_W) == GLFW_PRESS) { // front
@@ -367,15 +342,18 @@ public:
             yaw -= cameraYawSpeed;
         }
         glm::vec3 direction;
-        direction.x = cos(yaw) * sin(pitch);
-        direction.y = cos(pitch);
-        direction.z = sin(yaw) * sin(pitch);
+        direction.x = std::cos(yaw) * std::sin(pitch);
+        direction.y = std::cos(pitch);
+        direction.z = std::sin(yaw) * std::sin(pitch);
         direction = worldToCamera * direction;
         if (!isfinite(direction.x) || !isfinite(direction.y) || !isfinite(direction.z)) {
             fputs("infinite direction!\n", stderr);
             return;
         }
-        camera.lookAt(camera.position() + direction);
+        if (glm::length(direction - dir) >= 1e-3) {
+            // avoid escalating
+            camera.lookAt(camera.position() + direction);
+        }
     }
 
     void updateMouse() {
@@ -394,16 +372,16 @@ public:
             constexpr float cameraPitchSpeed = math::radians(-90);
             constexpr float cameraYawSpeed = math::radians(180);
             constexpr float cameraMinPitch = math::radians(10), cameraMaxPitch = math::radians(170);
-            float pitch = acos(glm::dot(up, glm::normalize(dir))); // [0, 180)
+            float pitch = std::acos(glm::dot(up, glm::normalize(dir))); // [0, 180)
             const auto projection = cameraToWorld * (dir - glm::dot(dir, up) * up);
 
             float yaw = atan2(projection.z, projection.x);
             pitch = std::clamp(pitch - (float) deltaY * cameraPitchSpeed, cameraMinPitch, cameraMaxPitch);
             yaw -= cameraYawSpeed * (float) deltaX;
             glm::vec3 direction;
-            direction.x = cos(yaw) * sin(pitch);
-            direction.y = cos(pitch);
-            direction.z = sin(yaw) * sin(pitch);
+            direction.x = std::cos(yaw) * std::sin(pitch);
+            direction.y = std::cos(pitch);
+            direction.z = std::sin(yaw) * std::sin(pitch);
             direction = worldToCamera * direction;
             if (!isfinite(direction.x) || !isfinite(direction.y) || !isfinite(direction.z)) {
                 fputs("infinite direction!\n", stderr);
@@ -430,7 +408,7 @@ public:
             bulletLife = bulletMaxLife;
             rightButtonClicked = false;
         }
-        // update showCursor here since delta would not be have been calculated until next update
+        // update showCursor here std::since delta would not be have been calculated until next update
         if (glfwGetKey(window(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
             glfwGetKey(window(), GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
             if (!showCursor) {
