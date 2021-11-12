@@ -109,8 +109,6 @@ set_target_properties(assignment PROPERTIES XCODE_ATTRIBUTE_CONFIGURATION_BUILD_
 
 add_custom_target(copy_assets
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
-        )
-add_custom_target(copy_shaders
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/lib/shaders ${CMAKE_CURRENT_BINARY_DIR}/lib/shaders
         )
-add_dependencies(assignment copy_assets copy_shaders)
+add_dependencies(assignment copy_assets)

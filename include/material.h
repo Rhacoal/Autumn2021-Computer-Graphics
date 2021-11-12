@@ -21,13 +21,15 @@ public:
     glm::vec4 color{1.0f};
     glm::vec3 emission{0.0f};
     float ior = 1.0f;
-    float tranSpec = 0.0f;
+    float specTrans = 0.0f;
 
     Material() : id(latest_id++) {}
 
     Material(const Material &) = delete;
 
     Material(Material &&) = delete;
+
+    virtual StandardMaterial *isStandardMaterial();
 
     /**
      * Called before switching to this shader program. This method is called only once per frame for all objects sharing
@@ -86,6 +88,8 @@ public:
     GLuint useShaderProgram(Scene &scene, Camera &camera, ProgramArguments &pargs) override;
 
     void updateUniforms(Object3D *object, Camera &camera) override;
+
+    StandardMaterial *isStandardMaterial() override;
 };
 
 class SkyboxMaterial : public Material {

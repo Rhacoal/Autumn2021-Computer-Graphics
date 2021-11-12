@@ -23,7 +23,7 @@ struct TextureImpl {
         rhs.tex = 0;
     }
 
-    void generate(int width, int height, GLuint format) {
+    void generate(int width, int height, GLint format) {
         if (tex) {
             glDeleteTextures(1, &tex);
             tex = 0u;
@@ -49,12 +49,6 @@ struct TextureImpl {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         tex = texture;
-    }
-
-    void fill(int width, int height, float *data) {
-        if (!tex) {
-        }
-
     }
 
     ~TextureImpl() {

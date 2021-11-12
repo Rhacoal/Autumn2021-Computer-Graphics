@@ -33,7 +33,7 @@
         "intensity": 0.0
       },
       "roughness": {
-        "intensity": 1.0
+        "intensity": 0.2
       }
     },
     {
@@ -48,10 +48,8 @@
       "roughness": {
         "intensity": 0.1
       },
-      "physical": {
-        "ior": 1.5,
-        "transmittance": 0.4
-      }
+      "ior": 1.5,
+      "specTrans": 1.0
     },
     {
       "id": "mtl-dragon",
@@ -64,7 +62,9 @@
       },
       "roughness": {
         "intensity": 0.01
-      }
+      },
+      "ior": 1.0,
+      "specTrans": 0.0
     },
     {
       "id": "mtl-light",
@@ -105,7 +105,7 @@
       "id": "dragon",
       "geometry": {
         "type": "file",
-        "file": "object/dragon_vrip.ply"
+        "file": "object/dragon_vrip_res4.ply"
       },
       "position": [1.0, 0.0, -5.0],
       "scale": [10.0, 10.0, 10.0],

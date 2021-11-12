@@ -58,7 +58,7 @@ class AppMain : public cg::Application {
     inline static AppMain *appMain = nullptr;
     Renderer renderer;
     PerspectiveCamera camera;
-    std::optional<ShaderPass> invert, gray, gammaCorrection, trivial;
+    std::optional<ShaderPass> invert, gray, gammaCorrection;
     std::optional<ShaderPassLink> shaderPasses;
     std::optional<RayTracingRenderer> rtRenderer;
     RayTracingScene rtRendererScene;
@@ -235,7 +235,7 @@ public:
                     if (!rtRenderer.has_value()) {
                         rtRenderer.emplace();
                     }
-                    rtRenderer->init(480, 270);
+                    rtRenderer->init(1024, 576);
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
                     use_ray_tracing = true;
@@ -408,7 +408,7 @@ public:
             bulletLife = bulletMaxLife;
             rightButtonClicked = false;
         }
-        // update showCursor here std::since delta would not be have been calculated until next update
+        // update showCursor here since delta would not be have been calculated until next update
         if (glfwGetKey(window(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
             glfwGetKey(window(), GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
             if (!showCursor) {

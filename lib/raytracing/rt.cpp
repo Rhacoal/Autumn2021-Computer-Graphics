@@ -22,6 +22,7 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     triangles.clear();
     lights.clear();
     std::map<Material *, uint32_t> mtlMap;
+    std::vector<Texture> usedTextures;
     scene.traverse([&](Object3D &object) {
         Mesh *mesh = object.isMesh();
         if (!mesh || mesh->isBackground()) return;
@@ -44,11 +45,32 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
             auto rtMtl = RayTracingMaterial{
                 .albedo = toFloat4(mtl->color),
                 .emission = toFloat3(mtl->emission),
+                // default parameters
                 .metallic = 0.3f,
                 .roughness = 0.2f,
                 .specTrans = 0.0f,
                 .ior = 1.35f,
+                // maps
+                .albedoMap = MAP_NONE,
+                .metallicMap = MAP_NONE,
+                .roughnessMap = MAP_NONE,
             };
+            if (mtl->isStandardMaterial()) {
+                auto stdMtl = mtl->isStandardMaterial();
+                rtMtl.metallic = stdMtl->metallicIntensity;
+                rtMtl.roughness = stdMtl->roughnessIntensity;
+                rtMtl.specTrans = stdMtl->specTrans;
+                rtMtl.ior = stdMtl->ior;
+                if (stdMtl->albedoMap.has_value()) {
+                    usedTextures.emplace_back(stdMtl->albedoMap.value());
+                }
+                if (stdMtl->metallicMap.has_value()) {
+                    usedTextures.emplace_back(stdMtl->metallicMap.value());
+                }
+                if (stdMtl->roughnessMap.has_value()) {
+                    usedTextures.emplace_back(stdMtl->roughnessMap.value());
+                }
+            }
             mtlIndex = materials.size();
             mtlMap[mtl] = mtlIndex;
             materials.emplace_back(rtMtl);
@@ -175,7 +197,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
     auto triangleMemBuffer = scene.triangles.data();
     auto materialMemBuffer = scene.materials.data();
     auto bvhMemBuffer = scene.bvh.nodes.data();
-    rayMemBuffer.resize(_width * _height);
+    rayMemBuffer.resize(_width * _height * spp);
     accumulateFrameBuffer.resize(_width * _height * 4);
     if (camera.up() != up || camera.lookDir() != dir || camera.position() != pos) {
         up = camera.up();
@@ -184,30 +206,31 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
         samples = 0;
         std::fill(accumulateFrameBuffer.begin(), accumulateFrameBuffer.end(), 0.0f);
     }
-    samples += 1;
-    CPUDispatcher dispatcher{.cores = 24};
-    // __global Ray *output,
-    // uint width, uint height, ulong globalSeed,
-    // float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
+    samples += spp;
+    CPUDispatcher dispatcher{.cores = 1};
     PerspectiveCamera *perspectiveCamera = camera.isPerspectiveCamera();
 
+    // __global Ray *output,
+    // uint width, uint height, uint spp, ulong globalSeed,
+    // float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
     dispatcher.dispatch(_width * _height, raygeneration_kernel,
-        rayMemBuffer.data(), _width, _height, seedMemBuffer.data(),
+        rayMemBuffer.data(), _width, _height, spp, seedMemBuffer.data(),
         toFloat3(camera.position()), toFloat3(camera.lookDir()), toFloat3(camera.up()),
         perspectiveCamera->fov() / 180.f * math::pi<float>(), perspectiveCamera->near());
+
     // __global float4 *output, uint width, uint height,
     // __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
     // __global uint *lights, uint lightCount,
-    // __global Ray *rays, uint bounces,
+    // __global float3 *rays, float3 cameraPosition, uint bounces,
     // ulong globalSeed, uint spp
     dispatcher.dispatch(_width * _height, render_kernel,
         reinterpret_cast<float4 *>(accumulateFrameBuffer.data()), _width, _height,
         bvhMemBuffer, triangleMemBuffer, materialMemBuffer,
         scene.lights.data(), scene.lights.size(),
-        rayMemBuffer.data(), bounces,
-        seedMemBuffer.data(), 1
+        rayMemBuffer.data(), toFloat3(camera.position()), bounces,
+        seedMemBuffer.data(), spp
     );
-    CPUDispatcher{.cores = 1}.dispatch(_width * _height * 4, [&]() {
+    CPUDispatcher{.cores = 24}.dispatch(_width * _height * 4, [&]() {
         uint id = get_global_id(0);
         frameBuffer[id] = accumulateFrameBuffer[id] / samples;
     });
@@ -232,11 +255,12 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
 
         // __global Ray *output,
         rayGenerationKernel.setArg(0, rayBuffer());
-        // uint width, uint height,
+        // uint width, uint height, uint spp
         rayGenerationKernel.setArg(1, _width);
         rayGenerationKernel.setArg(2, _height);
+        rayGenerationKernel.setArg(3, spp);
         // ulong globalSeed,
-        rayGenerationKernel.setArg(3, seedBuffer());
+        rayGenerationKernel.setArg(4, seedBuffer());
 
         // __global float4 *output, uint width, uint height,
         renderKernel.setArg(0, accumulateBuffer());
@@ -249,23 +273,24 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         // __global uint *lights, uint lightCount,
         renderKernel.setArg(6, lightBuffer());
         renderKernel.setArg(7, static_cast<uint>(scene.lights.size()));
-        // __global Ray *rays, uint bounces,
+        // __global Ray *rays, float3 cameraPosition, uint bounces,
         renderKernel.setArg(8, rayBuffer());
-        renderKernel.setArg(9, bounces);
+        renderKernel.setArg(9, toFloat3(pos));
+        renderKernel.setArg(10, bounces);
         // ulong globalSeed, uint spp
-        renderKernel.setArg(10, seedBuffer());
-        renderKernel.setArg(11, uint(1));
+        renderKernel.setArg(11, seedBuffer());
+        renderKernel.setArg(12, spp);
 
         // __global float4 *output, uint width, uint height
         clearKernel.setArg(0, accumulateBuffer());
         clearKernel.setArg(1, _width);
-        clearKernel.setArg(2, _width);
+        clearKernel.setArg(2, _height);
 
         // __global float4 *input, uint width, uint height, uint spp, __global float4 *output
         accumulateKernel.setArg(0, accumulateBuffer());
         accumulateKernel.setArg(1, _width);
         accumulateKernel.setArg(2, _height);
-        accumulateKernel.setArg(3, uint(1));
+        accumulateKernel.setArg(3, spp);
         accumulateKernel.setArg(4, outputBuffer());
 
         scene.bufferNeedUpdate = false;
@@ -289,18 +314,23 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         dir = newDir;
         pos = newPos;
         samples = 0;
+
+        // float3 cameraPosition
+        renderKernel.setArg(9, toFloat3(pos));
+
+        // float3 cameraPosition, float3 cameraDir, float3 cameraUp,
+        rayGenerationKernel.setArg(5, toFloat3(pos));
+        rayGenerationKernel.setArg(6, toFloat3(dir));
+        rayGenerationKernel.setArg(7, toFloat3(up));
     }
-    samples += 1;
-    // float3 cameraPosition, float3 cameraDir, float3 cameraUp,
-    rayGenerationKernel.setArg(4, toFloat3(pos));
-    rayGenerationKernel.setArg(5, toFloat3(dir));
-    rayGenerationKernel.setArg(6, toFloat3(up));
+    samples += spp;
+
     // float fov, float near
-    rayGenerationKernel.setArg(7, (perspective->fov() / 180.f * math::pi<float>()));
-    rayGenerationKernel.setArg(8, perspective->near());
+    rayGenerationKernel.setArg(8, (perspective->fov() / 180.f * math::pi<float>()));
+    rayGenerationKernel.setArg(9, perspective->near());
 
     // spp
-    accumulateKernel.setArg(3, static_cast<uint>(samples));
+    accumulateKernel.setArg(3, samples);
 
     // ray tracing
     cl::Event rayGen;
@@ -332,7 +362,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
 }
 
 void cg::RayTracingRenderer::drawFrameBuffer() {
-    texture.setData(_width, _height, GL_RGB, GL_RGBA, GL_FLOAT, frameBuffer.data());
+    texture.setData(_width, _height, GL_RGB32F, GL_RGBA, GL_FLOAT, frameBuffer.data());
     if (!trivialShader.has_value()) {
         trivialShader.emplace();
     }
@@ -431,13 +461,14 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
         seedMemBuffer.resize(_width * _height * 4);
         std::uniform_int_distribution<ulong> distribution;
-        for (ulong &ul : seedMemBuffer) {
+        for (ulong &ul: seedMemBuffer) {
             ul = distribution(engine);
         }
 
         int err;
-        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(Ray), nullptr, &err);
-        seedBuffer = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, width * height * sizeof(ulong), seedMemBuffer.data(), &err);;
+        rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * spp * sizeof(float4), nullptr, &err);
+        seedBuffer = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, width * height * sizeof(ulong),
+            seedMemBuffer.data(), &err);;
         outputBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr, &err);
         accumulateBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * sizeof(float4), nullptr, &err);
         sceneBufferNeedUpdate = true;

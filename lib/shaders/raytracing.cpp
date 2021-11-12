@@ -8,7 +8,7 @@ float3 BxDF(__global RayTracingMaterial *material,
 //    return vec3(dot(wi, normal)) * material->albedo * RT_M_1_PI_F;
     float3 reflection = Disney_BRDF(wi, wo, normal, material->albedo, 0.0f,
         material->metallic, 0.5f, 0.0f, material->roughness);
-    return reflection;
+    return clamp(reflection, 0.0f, 1.0f);
 }
 
 /**
@@ -27,7 +27,7 @@ bool intersect(Ray ray, Triangle triangle, Intersection *intersection) {
 
     float3 pvec = cross(ray.direction, e02);
     float det = dot(e01, pvec);
-    if (fabs(det) < 1e-8) return false;
+    if (fabs(det) < 1e-5) return false;
     float invDet = 1 / det;
 
     float3 tvec = ray.origin - triangle.v0.position;
@@ -98,8 +98,6 @@ bool boundsRayIntersects(Ray ray, Bounds3 bounds3) {
 }
 
 bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primitives, Intersection *output) {
-    // TODO: fix possible stack overflow
-    // probably no need...
     uint stack[64];
     stack[0] = 0;
     uint stackSize = 1;
@@ -113,7 +111,7 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
         BVHNode node = bvh[nodeIdx];
         if (node.isLeaf) {
             if (intersect(ray, primitives[node.offset], &intersection)) {
-                if (intersection.distance < maxT) {
+                if (intersection.distance > 1e-5 && intersection.distance < maxT) {
                     maxT = intersection.distance;
                     intersection.index = node.offset;
                     intersection.position = ray.origin + ray.direction * intersection.distance;
@@ -135,6 +133,9 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
                 stack[stackSize++] = t[1 - sign[node.dim]];
             }
         }
+        if (stackSize >= 63) {
+            break;
+        }
     }
     output->padding = mss;
 
@@ -142,30 +143,33 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
 }
 
 __kernel void raygeneration_kernel(
-    __global Ray *output,
-    uint width, uint height,
+    __global float3 *output,
+    uint width, uint height, uint spp,
     __global ulong *globalSeed,
     float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 ) {
     const uint pixel_id = get_global_id(0);
     ulong seed = globalSeed[pixel_id];
     seed = next(&seed, 48);
-    float pixel_x = pixel_id % width + randomFloat(&seed);
-    float pixel_y = pixel_id / width + randomFloat(&seed);
-    float ndc_x = (pixel_x / width) * 2.0f - 1.0f;
-    float ndc_y = (pixel_y / height) * 2.0f - 1.0f;
+    float px = (float) (pixel_id % width);
+    float py = (float) (pixel_id / width);
     float aspect = (float) width / (float) height;
     float top = near * tan(fov / 2);
-//    float top = 1.0f / (near * tan(fov));
-    float3 near_pos = vec3(ndc_x * top * aspect, ndc_y * top, -near);
+    float invWidth2 = 2.0f / (float) width;
+    float invHeight2 = 2.0f / (float) height;
     float3 cameraX = normalize(cross(cameraDir, cameraUp));
     float3 cameraY = cross(cameraX, cameraDir);
-    float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * (-cameraDir) + cameraPosition;
 
-    Ray ray;
-    ray.origin = cameraPosition;
-    ray.direction = normalize(world_pos - cameraPosition);
-    output[pixel_id] = ray;
+    for (uint i = 0; i < spp; ++i) {
+        float pixel_x = px + randomFloat(&seed);
+        float pixel_y = py + randomFloat(&seed);
+        // same as: float ndc_x = pixel_x / width * 2.0f - 1.0f
+        float ndc_x = (pixel_x * invWidth2) - 1.0f;
+        float ndc_y = (pixel_y * invHeight2) - 1.0f;
+        float3 near_pos = vec3(ndc_x * top * aspect, ndc_y * top, -near);
+        float3 world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * (-cameraDir) + cameraPosition;
+        output[pixel_id * spp + i] = normalize(world_pos - cameraPosition);
+    }
     globalSeed[pixel_id] = seed;
 }
 
@@ -185,175 +189,185 @@ __kernel void accumulate_kernel(
 
 __kernel void render_kernel(
     __global float4 *output, uint width, uint height,
-    __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
+    __global BVHNode *bvh, __global Triangle *triangles,
+    __global RayTracingMaterial *materials,
+//    __global RayTracingTextureRange *textures, image2d_t textureImage,
     __global const uint *lights, uint lightCount,
-    __global Ray *rays, uint bounces,
+    __global float3 *rays, float3 cameraPosition, uint bounces,
     __global ulong *globalSeed, uint spp
 ) {
-    const uint pixel_id = get_global_id(0);
-    Ray ray = rays[pixel_id];
-    ulong seed = globalSeed[pixel_id];
-    float3 sum = vec3(0.0);
-    float3 color = vec3(0.0);
-    if (pixel_id == width * (height / 2) + width / 2) {
-//        debugger;
+    const uint pixelId = get_global_id(0);
+    ulong seed = globalSeed[pixelId];
+    float3 sum = vec3(0.0f);
+    if (pixelId == width * (height / 2) + (width / 2)) {
+        debugger;
     }
 
-    // a maximum of 15 bounces is allowed
-    struct {
-        uint mtlIndex;
-        uint primtiveIndex;
-        float3 wo;
-        float3 wi;
-        float3 position;
-        float3 normal;
-        float2 texcoord;
-        float3 light;
-        float3 lightDir;
-        float3 debug;
+    for (uint sampleId = 0; sampleId < spp; ++sampleId) {
+        float3 rayDir = rays[pixelId * spp + sampleId];
         Ray ray;
-        float distance;
-        float pdf;
-        bool side;
-        bool isSky;
-        bool canReachLight;
-    } stack[16];
-    int bcnt = 0;
-    Intersection intersection;
-    intersection.distance = 0.0f;
-    for (uint i = 0; i <= bounces; ++i) {
-        if (firstIntersection(ray, bvh, triangles, &intersection)) {
-            bcnt += 1;
-            float3 wo = -ray.direction;
-            float3 pos = intersection.position;
-            stack[i].wo = wo;
-            stack[i].position = pos;
-            stack[i].mtlIndex = triangles[intersection.index].mtlIndex;
-            stack[i].primtiveIndex = intersection.index;
-            stack[i].distance = intersection.distance;
-            stack[i].side = intersection.side;
+        ray.direction = rayDir;
+        ray.origin = cameraPosition;
+        float3 color = vec3(0.0f);
 
-            Triangle triangle = triangles[intersection.index];
-            float3 normal = normalize(
-                triangle.v0.normal * intersection.barycentric.x +
-                triangle.v1.normal * intersection.barycentric.y +
-                triangle.v2.normal * intersection.barycentric.z
-            );
-            if (intersection.side) normal = -normal;
-            float3 w = normal;
-            stack[i].normal = normal;
-            stack[i].texcoord = (
-                triangle.v0.texcoord * intersection.barycentric.x +
-                triangle.v1.texcoord * intersection.barycentric.y +
-                triangle.v2.texcoord * intersection.barycentric.z
-            );
+        // a maximum of 15 bounces is allowed
+        struct {
+            uint mtlIndex;
+            uint primtiveIndex;
+            float3 wo;
+            float3 wi;
+            float3 position;
+            float3 normal;
+            float2 texcoord;
+            float3 light;
+            float3 lightDir;
+            float3 debug;
+            Ray ray;
+            float distance;
+            float pdf;
+            bool side;
+            bool isSky;
+            bool canReachLight;
+        } stack[16];
+        int bounceCount = 0;
+        Intersection intersection;
+        intersection.distance = 0.0f;
+        for (uint i = 0; i <= bounces; ++i) {
+            bounceCount += 1;
+            if (firstIntersection(ray, bvh, triangles, &intersection)) {
+                float3 wo = -ray.direction;
+                float3 pos = intersection.position;
+                stack[i].wo = wo;
+                stack[i].position = pos;
+                stack[i].mtlIndex = triangles[intersection.index].mtlIndex;
+                stack[i].primtiveIndex = intersection.index;
+                stack[i].distance = intersection.distance;
+                stack[i].side = intersection.side;
 
-            // TODO: fresnel
-//            __global RayTracingMaterial *material = materials + triangle.mtlIndex;
-//            float R0 = pow2((1.0f - material->ior) / (1.0f + material->ior));
-//            float Rtheta = R0 + (1.0f - R0) * pow5(dot(wo, w));
+                Triangle triangle = triangles[intersection.index];
+                float3 normal = normalize(
+                    triangle.v0.normal * intersection.barycentric.x +
+                    triangle.v1.normal * intersection.barycentric.y +
+                    triangle.v2.normal * intersection.barycentric.z
+                );
+                if (intersection.side) normal = -normal;
+                float3 w = normal;
+                stack[i].normal = normal;
+                stack[i].texcoord = (
+                    triangle.v0.texcoord * intersection.barycentric.x +
+                    triangle.v1.texcoord * intersection.barycentric.y +
+                    triangle.v2.texcoord * intersection.barycentric.z
+                );
 
-            // sample light
-            if (lightCount) {
-                uint i0 = randomInt(&seed, lightCount);
-                uint triangleIdx = lights[i0];
+                // TODO: fresnel
+                // __global RayTracingMaterial *material = materials + triangle.mtlIndex;
+                // float R0 = pow2((1.0f - material->ior) / (1.0f + material->ior));
+                // float Rtheta = R0 + (1.0f - R0) * pow5(dot(wo, w));
 
-                Triangle lightTriangle = triangles[triangleIdx];
-                float s, t;
-                do {
-                    s = randomFloat(&seed);
-                    t = sqrt(randomFloat(&seed));
-                } while (s + t > 1);
-                float3 e01 = lightTriangle.v1.position - lightTriangle.v0.position;
-                float3 e02 = lightTriangle.v2.position - lightTriangle.v0.position;
-                float3 lightPos = lightTriangle.v0.position + s * e01 + t * e02;
-                Intersection lightRayIntersection;
-                Ray lightRay;
-                lightRay.direction = normalize(lightPos - pos);
-                lightRay.origin = pos + lightRay.direction * 0.001f;
-                bool intersectLight = firstIntersection(lightRay, bvh, triangles, &lightRayIntersection);
-                stack[i].debug = intersectLight ? vec3(
-                    1.0f / (length(lightRayIntersection.position - lightPos) + 0.01f)) : vec3(1.0f, 0.0f, 0.0f);
-                if (intersectLight
-                    // TODO: this side criteria might be unstable!
-                    //                    && !lightRayIntersection.side
-                    && lightRayIntersection.index == triangleIdx) {
-                    stack[i].light = materials[lightTriangle.mtlIndex].emission
-                                     * fabs(dot(lightTriangle.v0.normal, -lightRay.direction))
-                                     / length(lightPos - pos)
-                                     / (0.5f / length(cross(e01, e02))); // pdf_light
-                    stack[i].lightDir = lightRay.direction;
-                    stack[i].canReachLight = true;
+                // sample light
+                if (lightCount) {
+                    uint i0 = randomInt(&seed, lightCount);
+                    uint triangleIdx = lights[i0];
+
+                    Triangle lightTriangle = triangles[triangleIdx];
+                    float s, t;
+                    do {
+                        s = randomFloat(&seed);
+                        t = sqrt(randomFloat(&seed));
+                    } while (s + t > 1);
+                    float3 e01 = lightTriangle.v1.position - lightTriangle.v0.position;
+                    float3 e02 = lightTriangle.v2.position - lightTriangle.v0.position;
+                    float3 lightPos = lightTriangle.v0.position + s * e01 + t * e02;
+                    Intersection lightRayIntersection;
+                    Ray lightRay;
+                    lightRay.direction = normalize(lightPos - pos);
+                    lightRay.origin = pos + lightRay.direction;
+                    bool intersectLight = firstIntersection(lightRay, bvh, triangles, &lightRayIntersection);
+                    stack[i].debug = intersectLight ? vec3(
+                        1.0f / (length(lightRayIntersection.position - lightPos) + 0.01f)) : vec3(1.0f, 0.0f, 0.0f);
+                    if (intersectLight
+                        // TODO: this side criteria might be unstable!
+                        //                    && !lightRayIntersection.side
+                        && lightRayIntersection.index == triangleIdx) {
+                        stack[i].light = materials[lightTriangle.mtlIndex].emission
+                                         * fabs(dot(lightTriangle.v0.normal, -lightRay.direction))
+                                         / length(lightPos - pos)
+                                         / (0.5f / length(cross(e01, e02))); // pdf_light
+                        stack[i].lightDir = lightRay.direction;
+                        stack[i].canReachLight = true;
+                    } else {
+                        stack[i].light = vec3(0.0f);
+                        stack[i].canReachLight = false;
+                    }
                 } else {
                     stack[i].light = vec3(0.0f);
                     stack[i].canReachLight = false;
                 }
+
+                // select next position
+                float a = randomFloat(&seed), b = randomFloat(&seed);
+                float phi = RT_M_PI_F * 20.0f * a, theta = acos(b);
+                float3 temp = fabs(w.x) > 0.1f ? vec3(0.0f, 1.0f, 0.0f) : vec3(1.0f, 0.0f, 0.0f);
+                stack[i].pdf = RT_M_1_PI_F * 0.5f; // pdf(phi, theta) = 1 / 2pi
+                float3 u = normalize(cross(temp, w));
+                float3 v = cross(w, u);
+
+                float3 next = normalize(w * b +
+                                        u * sin(theta) * cos(phi) +
+                                        v * sin(theta) * sin(phi));
+                stack[i].wi = next;
+                ray.origin = pos + next; // avoid self-intersection
+                ray.direction = next;
+                stack[i].ray = ray;
+                stack[i].isSky = false;
             } else {
-                stack[i].light = vec3(0.0f);
-                stack[i].canReachLight = false;
+                // TODO draw sky
+                stack[i].isSky = true;
+                break;
             }
-
-            // select next position
-            float a = randomFloat(&seed), b = randomFloat(&seed);
-            float phi = RT_M_PI_F * 20.0f * a, theta = acos(b);
-            float3 temp = fabs(w.x) > 0.1f ? vec3(0.0f, 1.0f, 0.0f) : vec3(1.0f, 0.0f, 0.0f);
-            stack[i].pdf = RT_M_1_PI_F * 0.5f; // pdf(phi, theta) = 1 / 2pi
-            float3 u = normalize(cross(temp, w));
-            float3 v = cross(w, u);
-
-            float3 next = normalize(w * b +
-                                    u * sin(theta) * cos(phi) +
-                                    v * sin(theta) * sin(phi));
-            stack[i].wi = next;
-            ray.origin = pos + next * 0.001f; // avoid self-intersection
-            ray.direction = next;
-            stack[i].ray = ray;
-            stack[i].isSky = false;
-        } else {
-            // TODO draw sky
-            ++bcnt;
-            stack[i].isSky = true;
-            break;
         }
-    }
 
-    for (int i = bcnt - 1; i >= 0; --i) {
-        if (stack[i].isSky) {
-            // TODO IBL sky
-//            color = vec3(0.0f, 0.046f, 0.311f);
-            color = vec3(0.0f);
-        } else {
-            __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
-            float3 contrib = color * BxDF(
-                material,
-                stack[i].normal, stack[i].position, stack[i].texcoord,
-                stack[i].wi, stack[i].wo
-            ) * dot(stack[i].normal, stack[i].wi) / stack[i].pdf;
-            if (stack[i].canReachLight) {
-                contrib += stack[i].light * BxDF(
+        for (int i = bounceCount - 1; i >= 0; --i) {
+            if (stack[i].isSky) {
+                // TODO IBL sky
+                color = vec3(0.0f, 0.023f, 0.1f);
+            } else {
+                __global RayTracingMaterial *material = materials + triangles[stack[i].primtiveIndex].mtlIndex;
+                float3 contrib = color * BxDF(
                     material,
                     stack[i].normal, stack[i].position, stack[i].texcoord,
-                    stack[i].lightDir, stack[i].wo
-                ) * dot(stack[i].normal, stack[i].lightDir);
-                stack[i].debug = vec3(dot(stack[i].wi, stack[i].normal));
+                    stack[i].wi, stack[i].wo
+                ) * dot(stack[i].normal, stack[i].wi) / stack[i].pdf;
+                if (stack[i].canReachLight) {
+                    contrib += stack[i].light * BxDF(
+                        material,
+                        stack[i].normal, stack[i].position, stack[i].texcoord,
+                        stack[i].lightDir, stack[i].wo
+                    ) * dot(stack[i].normal, stack[i].lightDir);
+                }
+                stack[i].debug = contrib;
+                color = contrib;
+                if (i == 0) {
+                    // to display lighting source
+                    color += material->emission;
+                }
             }
-            color = contrib + material->emission;
         }
-    }
-    if (!stack[0].isSky) {
-//        color = stack[0].normal * 0.5f + 0.5f;
-//        color = stack[0].canReachLight ? stack[0].debug : vec3(0.0f);
-    }
 
-    uint x = pixel_id % width;
-    uint y = pixel_id / width;
-    float fx = (float) x / (float) width;
-    float fy = (float) y / (float) height;
-
-    globalSeed[pixel_id] = seed;
-    if (isfinite(color.x) && isfinite(color.y) && isfinite(color.z)) {
-        output[pixel_id] += vec4(color, 1.0f);
+        if (isfinite(color.x) && isfinite(color.y) && isfinite(color.z)) {
+//            float max_v = fmax(color.x, fmax(color.y, color.z));
+//            if (max_v > 100.0f) {
+//                color /= (max_v / 100.0f);
+//            }
+            sum += color;
+        }
+//        if (sampleId == 1) {
+//            sum = stack[0].debug;
+//            break;
+//        }
     }
+    globalSeed[pixelId] = seed;
+    output[pixelId] += vec4(sum, (float) spp);
 }
 
 __kernel void test_kernel(__global float4 *output, uint width, uint height) {

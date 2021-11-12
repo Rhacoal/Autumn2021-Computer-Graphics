@@ -13,6 +13,10 @@
 
 int cg::Material::latest_id = 1;
 
+cg::StandardMaterial *cg::Material::isStandardMaterial() {
+    return nullptr;
+}
+
 inline std::string readShaderFile(const char *path) {
     static std::regex pattern(R"(#include\s+("|<)(.*)(>|"))");
     const auto file = cg::readFile(path);
@@ -199,6 +203,10 @@ void cg::StandardMaterial::updateUniforms(cg::Object3D *object, cg::Camera &came
     auto pMatrix = camera.projectionMatrix();
     auto mvpMatrix = pMatrix * vMatrix * modelMatrix;
     shader.setUniformMatrix4("mvpMatrix", mvpMatrix);
+}
+
+cg::StandardMaterial *cg::StandardMaterial::isStandardMaterial() {
+    return this;
 }
 
 const char *skybox_vert = R"(

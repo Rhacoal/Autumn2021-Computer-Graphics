@@ -19,8 +19,8 @@ float3 BxDF(__global RayTracingMaterial *material,
             float3 wi, float3 wo);
 
 __kernel void raygeneration_kernel(
-    __global Ray *output,
-    uint width, uint height,
+    __global float3 *output,
+    uint width, uint height, uint spp,
     __global ulong *globalSeed,
     float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
 );
@@ -33,7 +33,7 @@ __kernel void render_kernel(
     // light tracing
     __global const uint *lights, uint lightCount,
     // path tracing
-    __global Ray *rays, uint bounces,
+    __global float3 *rays, float3 cameraPosition, uint bounces,
     // sampling
     __global ulong *globalSeed, uint spp
 );

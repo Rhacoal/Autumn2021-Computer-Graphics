@@ -11,6 +11,8 @@
 #define vec4 (float4)
 #endif
 
+#define MAP_NONE ((uint) 0x7fffffff)
+
 typedef struct RayTracingMaterial {
     float3 albedo;
     float3 emission;
@@ -18,10 +20,16 @@ typedef struct RayTracingMaterial {
     float roughness;
     float specTrans;
     float ior;
+    uint albedoMap;
     uint metallicMap;
     uint roughnessMap;
-    uint padding[2];
+    uint padding;
 } RayTracingMaterial;
+
+typedef struct RayTracingTextureRange {
+    float2 pMin;
+    float2 pMax;
+} RayTracingTextureRange;
 
 typedef struct Vertex {
     float3 position;

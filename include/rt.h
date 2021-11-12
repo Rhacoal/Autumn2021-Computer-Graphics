@@ -83,11 +83,11 @@ class RayTracingRenderer {
 
     // camera and resampling
     glm::vec3 up, dir, pos;
-    int samples = 0;
-    uint spp = 1;
+    uint samples = 0;
+    uint spp = 10;
 
     // cpu related buffers
-    std::vector<Ray> rayMemBuffer;
+    std::vector<float3> rayMemBuffer;
     std::vector<ulong> seedMemBuffer;
 
     // random generator
@@ -95,7 +95,7 @@ class RayTracingRenderer {
     std::default_random_engine engine{r()};
 
     // raytracing config
-    uint bounces = 3;
+    uint bounces = 4;
 
     size_t frameBufferSize() const {
         return frameBuffer.size() * sizeof(float);
