@@ -41,6 +41,8 @@ inline void assert_ok() {
 }
 
 namespace math {
+constexpr float epsilon = 1e-5f;
+
 template<typename F = double>
 constexpr F pi() {
     return F(3.14159265358979323846);

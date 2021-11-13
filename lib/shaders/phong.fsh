@@ -71,11 +71,11 @@ void main() {
         vec3 L = normalize(lightVec);
         vec3 H = normalize(L + V);
         float lambert = clamp(dot(N, L), 0.0, 1.0);
-        float spec = pow(clamp(dot(N, H), 0.0, 1.0), shininess) / dot(lightVec, lightVec);
+        float spec = pow(clamp(dot(N, H), 0.0, 1.0), shininess);
 
         vec3 lightColor = spec * pointLights[i].color +
                           RECIPROCAL_PI * diffuseColor.rgb * pointLights[i].color;
-        result += (spec * pointLights[i].color.rgb * power);
+        result += (spec * pointLights[i].color) / dot(lightVec, lightVec);
         result += lightColor * lambert;
     }
 #endif

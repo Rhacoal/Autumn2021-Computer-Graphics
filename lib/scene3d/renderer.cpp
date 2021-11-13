@@ -3,7 +3,7 @@
 #include <material.h>
 #include <geometry.h>
 #include <scene.h>
-#include <lighting.h>
+#include <light.h>
 #include <camera.h>
 
 #include <optional>
@@ -54,19 +54,29 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
     std::sort(begin(draw_calls), end(draw_calls), [](const auto &l, const auto &r) {
         const auto&[l_mat, l_geo, l_obj] = l;
         const auto&[r_mat, r_geo, r_obj] = r;
+        // draw transparent objects last
+        if (l_mat->isTransparent() != r_mat->isTransparent()) {
+            return r_mat->isTransparent();
+        }
         // draw same materials together
         return l_mat < r_mat;
-        // TODO draw transparent objects last
     });
 
     // render objects in order
     std::optional<Material *> current_material;
+    bool handleTransparency = false;
+    glDisable(GL_BLEND);
     GLuint sp = 0;
     for (auto[mat, geo, obj] : draw_calls) {
         if (current_material != mat) {
             // switch material
             sp = mat->useShaderProgram(sc, cam, pargs);
             current_material = mat;
+            if (mat->isTransparent() && !handleTransparency) {
+                handleTransparency = true;
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA , GL_ONE_MINUS_SRC_ALPHA);
+            }
         }
 
         mat->updateUniforms(obj, cam);
@@ -79,6 +89,9 @@ void cg::Renderer::render(Scene &sc, Camera &cam) {
         } else {
             check_err(glDrawArrays(geo->glPrimitiveType(), 0, geo->elementCount()));
         }
+    }
+    if (handleTransparency) {
+        glDisable(GL_BLEND);
     }
     glUseProgram(0);
 }

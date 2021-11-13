@@ -239,6 +239,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
 
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // update buffers (if needed)
+    bool needClear = false;
     int err;
     if (scene.bufferNeedUpdate || sceneBufferNeedUpdate) {
         // TODO actually fill in these buffers
@@ -295,6 +296,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
 
         scene.bufferNeedUpdate = false;
         sceneBufferNeedUpdate = false;
+        needClear = true;
 
         printf("Scene inited for RT");
     }
@@ -304,7 +306,6 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         throw std::runtime_error("Only perspective camera can be used for path tracing.");
     }
     // resample
-    bool needClear = false;
     auto newUp = camera.up();
     auto newDir = camera.lookDir();
     auto newPos = camera.position();
@@ -313,7 +314,6 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         up = newUp;
         dir = newDir;
         pos = newPos;
-        samples = 0;
 
         // float3 cameraPosition
         renderKernel.setArg(9, toFloat3(pos));
@@ -322,6 +322,9 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         rayGenerationKernel.setArg(5, toFloat3(pos));
         rayGenerationKernel.setArg(6, toFloat3(dir));
         rayGenerationKernel.setArg(7, toFloat3(up));
+    }
+    if (needClear) {
+        samples = 0;
     }
     samples += spp;
 

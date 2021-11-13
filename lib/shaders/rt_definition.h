@@ -3,20 +3,11 @@
 
 #include "lib/shaders/rt_structure.h"
 
-#define RT_M_PI_F           3.14159274101257f
-#define RT_M_PI             3.141592653589793115998
-#define RT_M_1_PI_F         0.31830987334251f
-#define RT_M_1_PI           0.318309886183790691216
-
 bool intersect(Ray, Triangle, Intersection *);
 
-bool boundsRayIntersects(Ray, Bounds3);
+bool boundsRayIntersects(Ray, Bounds3, float *, float *);
 
 bool firstIntersection(Ray, __global BVHNode *, __global Triangle *, Intersection *);
-
-float3 BxDF(__global RayTracingMaterial *material,
-            float3 normal, float3 position, float2 texcoord,
-            float3 wi, float3 wo);
 
 __kernel void raygeneration_kernel(
     __global float3 *output,

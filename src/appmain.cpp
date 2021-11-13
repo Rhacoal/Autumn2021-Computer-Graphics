@@ -4,7 +4,7 @@
 #include <material.h>
 #include <geometry.h>
 #include <mesh.h>
-#include <lighting.h>
+#include <light.h>
 #include <obj_loader.h>
 #include <rt.h>
 #include <helper/axis_helper.h>
@@ -112,13 +112,13 @@ public:
         currentScene().addChild(skybox);
 
         // lighting
-        currentScene().addChild(new AmbientLight(glm::vec3(1.0f, 1.0f, 1.0f), .1f));
-        dirLight = new DirectionalLight(glm::vec3(0.45f, -0.48f, 0.75f), glm::vec3(1.0f, 1.0f, 1.0f), 1.f);
-        currentScene().addChild(dirLight);
+        currentScene().addChild(new AmbientLight(glm::vec3(1.0f, 1.0f, 1.0f), .05f));
+//        dirLight = new DirectionalLight(glm::vec3(0.45f, -0.48f, 0.75f), glm::vec3(1.0f, 1.0f, 1.0f), 1.f);
+//        currentScene().addChild(dirLight);
 
         // camera
-        camera.setPosition(glm::vec3(5.0f, 5.0f, 5.0f));
-        camera.lookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+        camera.setPosition(glm::vec3(1.59f, 2.50f, 5.84f));
+        camera.lookToDir(glm::vec3(-0.21f, -0.14f, -0.97f));
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));

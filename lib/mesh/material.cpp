@@ -1,7 +1,7 @@
 #include <material.h>
 #include <scene.h>
 #include <renderer.h>
-#include <lighting.h>
+#include <light.h>
 #include <camera.h>
 #include <texture.h>
 
@@ -70,13 +70,13 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
         char name[256];
         // TODO cache locations
         for (int i = 0; i < pargs.pointLightCount; ++i) {
-            snprintf(name, 256, "pargs.pointLights[%d].position", pargs.pointLightCount);
+            snprintf(name, 256, "pointLights[%d].position", i);
             shader.setUniform3f(name, pargs.pointLights[i].position);
 
-            snprintf(name, 256, "pargs.pointLights[%d].direction", pargs.pointLightCount);
+            snprintf(name, 256, "pointLights[%d].direction", i);
             shader.setUniform3f(name, pargs.pointLights[i].direction);
 
-            snprintf(name, 256, "pargs.pointLights[%d].color", pargs.pointLightCount);
+            snprintf(name, 256, "pointLights[%d].color", i);
             shader.setUniform3f(name, pargs.pointLights[i].color);
         }
         if (pargs.directionalLightCount) {
@@ -84,6 +84,7 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
             shader.setUniform3f("directionalLight.color", pargs.directionalLights[0].color);
         }
         shader.setUniform4f("color", color);
+        shader.setUniform3f("emission", emission);
         shader.setUniform1f("shininess", shininess);
         shader.setUniform3f("ambientLight", pargs.ambientColor);
 
@@ -143,13 +144,13 @@ GLuint cg::StandardMaterial::useShaderProgram(cg::Scene &scene, cg::Camera &came
     if (sp) {
         char name[256];
         for (int i = 0; i < pargs.pointLightCount; ++i) {
-            snprintf(name, 256, "pargs.pointLights[%d].position", pargs.pointLightCount);
+            snprintf(name, 256, "pointLights[%d].position", i);
             shader.setUniform3f(name, pargs.pointLights[i].position);
 
-            snprintf(name, 256, "pargs.pointLights[%d].direction", pargs.pointLightCount);
+            snprintf(name, 256, "pointLights[%d].direction", i);
             shader.setUniform3f(name, pargs.pointLights[i].direction);
 
-            snprintf(name, 256, "pargs.pointLights[%d].color", pargs.pointLightCount);
+            snprintf(name, 256, "pointLights[%d].color", i);
             shader.setUniform3f(name, pargs.pointLights[i].color);
         }
         if (pargs.directionalLightCount) {
@@ -187,6 +188,8 @@ GLuint cg::StandardMaterial::useShaderProgram(cg::Scene &scene, cg::Camera &came
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, normalMap.has_value() ? normalMap.value().tex() : 0);
 
+        shader.setUniform1f("ior", ior);
+
         // bind camera origin
         shader.setUniform3f("cameraPosition", camera.worldPosition());
         return sp;
@@ -207,6 +210,10 @@ void cg::StandardMaterial::updateUniforms(cg::Object3D *object, cg::Camera &came
 
 cg::StandardMaterial *cg::StandardMaterial::isStandardMaterial() {
     return this;
+}
+
+bool cg::StandardMaterial::isTransparent() const noexcept {
+    return transparent;
 }
 
 const char *skybox_vert = R"(

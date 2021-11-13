@@ -1,15 +1,7 @@
 #ifndef RT_STRUCTURE_H
 #define RT_STRUCTURE_H
 
-#ifdef __cplusplus
-
-#include <cl.hpp>
-#include <simcl.h>
-
-#else
-#define vec3 (float3)
-#define vec4 (float4)
-#endif
+#include "lib/shaders/rt_common.h"
 
 #define MAP_NONE ((uint) 0x7fffffff)
 

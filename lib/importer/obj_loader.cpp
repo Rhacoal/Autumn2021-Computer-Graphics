@@ -4,6 +4,7 @@
 #include <mesh.h>
 #include <geometry.h>
 #include <material.h>
+#include <light.h>
 #include <application.h>
 
 #include <json.hpp>
@@ -151,7 +152,7 @@ struct ObjLoader {
             return new SphereGeometry(radius, 50, 50);
         } else if (type == "plane") {
             auto size = getOrDefault(j, "size", glm::vec2(1.0f));
-            return new PlaneGeometry(size.x, size.y, Side::DoubleSide);
+            return new PlaneGeometry(size.x, size.y);
         } else if (type == "file") {
             return loadGeometryFromFile(j["file"]);
         } else {
@@ -190,6 +191,11 @@ struct ObjLoader {
         mesh->setPosition(glm::vec3{position[0], position[1], position[2]});
         mesh->setScale(scale);
         mesh->applyRotation(rotation);
+
+        if (getOrDefault(j, "isLight", false)) {
+            auto pointLight = new PointLight(mesh->material()->emission, 1.0f);
+            mesh->addChild(pointLight);
+        }
         auto bb = mesh->computeBoundingBox();
         return mesh;
     };
@@ -249,6 +255,7 @@ struct ObjLoader {
             stdMtl->emission = getOrDefault(j, "emission", glm::vec3(0.0f));
             stdMtl->ior = getOrDefault(j, "ior", 0.0f);
             stdMtl->specTrans = getOrDefault(j, "specTrans", 0.0f);
+            stdMtl->transparent = getOrDefault(j, "transparent", false);
             return stdMtl;
         } else if (type == "phong") {
             auto phongMtl = new PhongMaterial;

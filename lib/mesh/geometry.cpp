@@ -209,10 +209,10 @@ cg::SphereGeometry::SphereGeometry(float radius, int widthSegments, int heightSe
             }
         }
     }
-    addAttribute("position", position.data(), position.size(), 3);
-    addAttribute("normal", normal.data(), normal.size(), 3);
-    addAttribute("texcoord", texcoord.data(), texcoord.size(), 2);
-    addIndices(indices.data(), indices.size());
+    addAttribute("position", position, 3);
+    addAttribute("normal", normal, 3);
+    addAttribute("texcoord", texcoord, 2);
+    addIndices(indices);
 }
 
 cg::PlaneGeometry::PlaneGeometry(float sizeX, float sizeZ, Side side) {

@@ -38,6 +38,9 @@ uniform sampler2D aoMap;
 uniform float aoIntensity;
 uniform sampler2D normalMap;
 
+uniform vec3 emission;
+uniform float ior;
+
 in vec2 vUv;
 in vec3 worldPosition;
 in vec3 vNormal;
@@ -60,6 +63,7 @@ void main() {
 
     vec3 V = normalize(cameraPosition - worldPosition);
     vec3 N = normalize(vNormal);
+    float VdotN = abs(dot(V, N));
 
 #if DIRECTIONAL
     {
@@ -67,20 +71,24 @@ void main() {
         vec3 H = normalize(L + V);
         vec3 brdf = DisneyBRDF(L, V, N, baseColor.rgb, 0.0f, metallic, 0.5f, 0.0f, roughness);
 
-        result += directionalLight.color * brdf;
+        result += directionalLight.color * dot(L, N) * brdf;
     }
 #endif
 #if POINT_LIGHT_COUNT
     for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
         vec3 lightVec = pointLights[i].position - worldPosition;
-        vec3 L = normalize(directionalLight.direction);
+        vec3 L = normalize(lightVec);
         vec3 H = normalize(L + V);
         vec3 brdf = DisneyBRDF(L, V, N, baseColor.rgb, 0.0f, metallic, 0.5f, 0.0f, roughness);
 
-        result += pointLights[i].color * brdf / length(lightVec);
+        result += pointLights[i].color * dot(L, N) * brdf / length(lightVec);
     }
 #endif
     result.rgb += ambientLight * mix(vec3(0.04f), baseColor.rgb, metallic);
 
-    fragColor = vec4(result, opacity);
+    float r0s = (1.0f - ior) / (1.0f + ior);
+    float r0 = r0s * r0s;
+    float alpha = mix(opacity, 1.0f, SchlickFresnel(VdotN));
+
+    fragColor = vec4(result + emission, alpha);
 }

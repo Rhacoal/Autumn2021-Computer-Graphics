@@ -197,7 +197,7 @@ struct ShaderPassImpl {
         glGenFramebuffers(1, &fbo);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         // create a color attachment texture
-        colorBuffer.generate(width, height, GL_RGB32F);
+        colorBuffer.generate(width, height, GL_RGBA32F);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffer.tex(), 0);
         // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
         glGenRenderbuffers(1, &rbo);

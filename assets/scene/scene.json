@@ -27,20 +27,20 @@
       "id": "mtl-floor",
       "type": "standard",
       "albedo": {
-        "color": [0.1332085131842997, 0.0004925037871914326, 0.17677432164090326]
+        "color": [1, 0.7667436168621613, 0.33445780792388924]
       },
       "metallic": {
-        "intensity": 0.0
+        "intensity": 1.0
       },
       "roughness": {
-        "intensity": 0.2
+        "intensity": 0.3
       }
     },
     {
       "id": "mtl-bunny",
       "type": "standard",
       "albedo": {
-        "intensity": [0.0, 0.0, 0.0, 0.1]
+        "color": [0.798, 0.003, 1.056]
       },
       "metallic": {
         "intensity": 1.0
@@ -55,7 +55,7 @@
       "id": "mtl-dragon",
       "type": "standard",
       "albedo": {
-        "intensity": [0.56, 0.57, 0.58]
+        "color": [0.56, 0.57, 0.58]
       },
       "metallic": {
         "intensity": 1.0
@@ -65,6 +65,49 @@
       },
       "ior": 1.0,
       "specTrans": 0.0
+    },
+    {
+      "id": "mtl-glossy-mirror",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0]
+      },
+      "metallic": {
+        "intensity": 0.9
+      },
+      "roughness": {
+        "intensity": 0.01
+      }
+    },
+    {
+      "id": "mtl-glass-ball",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 0.0]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.0
+      },
+      "transparent": true,
+      "ior": 1.3333,
+      "specTrans": 1.0
+    },
+    {
+      "id": "mtl-mirror-box",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 1.0]
+      },
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 0.0
+      },
+      "ior": 1.3333
     },
     {
       "id": "mtl-light",
@@ -97,24 +140,42 @@
         "type": "file",
         "file": "object/bun_zipper_res2.ply"
       },
-      "position": [-2.0, 0.0, -2.0],
+      "position": [-2.0, 0.0, -1.5],
       "scale": [10.0, 10.0, 10.0],
       "material": "mtl-bunny"
     },
     {
-      "id": "dragon",
+      "id": "glossy-mirror",
       "geometry": {
-        "type": "file",
-        "file": "object/dragon_vrip_res4.ply"
+        "type": "box",
+        "size": [10.0, 2.0, 2.5]
       },
-      "position": [1.0, 0.0, -5.0],
-      "scale": [10.0, 10.0, 10.0],
-      "material": "mtl-dragon"
+      "position": [0.0, 3.0, -7.0],
+      "material": "mtl-glossy-mirror"
+    },
+    {
+      "id": "mirror-box",
+      "geometry": {
+        "type": "box",
+        "size": [10.0, 2.0, 2.5]
+      },
+      "position": [0.0, 1.0, -7.0],
+      "material": "mtl-mirror-box"
+    },
+    {
+      "id": "glass-ball",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.75
+      },
+      "position": [-1.0, 1.0, 0.0],
+      "material": "mtl-glass-ball"
     },
     {
       "id": "light",
       "isLight": true,
-      "position": [0.0, 5.0, 0.0],
+      "position": [0.0, 4.0, -2.0],
+      "rotation": [0.0, 1.0, 0.0, 0.0],
       "geometry": {
         "type": "plane",
         "size": [1.0, 1.0]

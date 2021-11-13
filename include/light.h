@@ -1,5 +1,5 @@
-#ifndef ASSIGNMENT_LIGHTING_H
-#define ASSIGNMENT_LIGHTING_H
+#ifndef ASSIGNMENT_LIGHT_H
+#define ASSIGNMENT_LIGHT_H
 
 #include <scene.h>
 
@@ -60,4 +60,4 @@ public:
 };
 }
 
-#endif //ASSIGNMENT_LIGHTING_H
+#endif //ASSIGNMENT_LIGHT_H

@@ -23,7 +23,8 @@ float smithG_GGX(float NdotV, float alphaG) {
     return 1.0f / (NdotV + sqrt(a + b - a * b));
 }
 
-vec3 DisneyBRDF(vec3 L, vec3 V, vec3 N, vec3 baseColor, float subsurface, float metallic, float specular, float specularTint, float roughness) {
+vec3 DisneyBRDF(vec3 L, vec3 V, vec3 N, vec3 baseColor, float subsurface, float metallic, float specular,
+                float specularTint, float roughness) {
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
     if (NdotL < 0 || NdotV < 0) return vec3(0.0f);

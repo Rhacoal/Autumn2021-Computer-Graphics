@@ -82,6 +82,8 @@ public:
     std::optional<Texture> normalMap;
     // environment map. should have mipmap calculated
     std::optional<CubeTexture> envMap;
+    // is transparent
+    bool transparent = false;
 
     StandardMaterial() = default;
 
@@ -90,6 +92,8 @@ public:
     void updateUniforms(Object3D *object, Camera &camera) override;
 
     StandardMaterial *isStandardMaterial() override;
+
+    bool isTransparent() const noexcept override;
 };
 
 class SkyboxMaterial : public Material {
