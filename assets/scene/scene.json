@@ -30,10 +30,10 @@
         "color": [1, 0.7667436168621613, 0.33445780792388924]
       },
       "metallic": {
-        "intensity": 1.0
+        "intensity": 0.0
       },
       "roughness": {
-        "intensity": 0.3
+        "intensity": 1.0
       }
     },
     {
@@ -47,9 +47,7 @@
       },
       "roughness": {
         "intensity": 0.1
-      },
-      "ior": 1.5,
-      "specTrans": 1.0
+      }
     },
     {
       "id": "mtl-dragon",
@@ -80,6 +78,20 @@
       }
     },
     {
+      "id": "mtl-dieletric-box",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 0.0]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.0
+      },
+      "ior": 1.0
+    },
+    {
       "id": "mtl-glass-ball",
       "type": "standard",
       "albedo": {
@@ -92,8 +104,8 @@
         "intensity": 0.0
       },
       "transparent": true,
-      "ior": 1.3333,
-      "specTrans": 1.0
+      "ior": 1.33,
+      "specTrans": 0.99
     },
     {
       "id": "mtl-mirror-box",
@@ -110,9 +122,35 @@
       "ior": 1.3333
     },
     {
+      "id": "mtl-diffuse-wall",
+      "type": "standard",
+      "albedo": {
+        "color": [0.4, 1.0, 0.5]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.7
+      }
+    },
+    {
+      "id": "mtl-diffuse-ceiling",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 0.4, 0.5]
+      },
+      "metallic": {
+        "intensity": 0.0
+      },
+      "roughness": {
+        "intensity": 0.7
+      }
+    },
+    {
       "id": "mtl-light",
       "type": "standard",
-      "emission": [20.0, 20.0, 20.0]
+      "emission": [5.0, 5.0, 5.0]
     }
   ],
   "objects": [
@@ -140,7 +178,7 @@
         "type": "file",
         "file": "object/bun_zipper_res2.ply"
       },
-      "position": [-2.0, 0.0, -1.5],
+      "position": [0.0, -0.3, -2.5],
       "scale": [10.0, 10.0, 10.0],
       "material": "mtl-bunny"
     },
@@ -150,17 +188,46 @@
         "type": "box",
         "size": [10.0, 2.0, 2.5]
       },
-      "position": [0.0, 3.0, -7.0],
+      "position": [0.0, 4, -7.0],
       "material": "mtl-glossy-mirror"
     },
     {
       "id": "mirror-box",
       "geometry": {
         "type": "box",
-        "size": [10.0, 2.0, 2.5]
+        "size": [10.0, 3.0, 2.5]
       },
-      "position": [0.0, 1.0, -7.0],
+      "position": [0.0, 1.5, -7.0],
       "material": "mtl-mirror-box"
+    },
+    {
+      "id": "dielectric-box",
+      "geometry": {
+        "type": "box",
+        "size": [2.0, 3.0, 2.0]
+      },
+      "rotation": [0.8, 0.0, 0.6, 0.0],
+      "position": [-3.0, 1.5, -3.75],
+      "material": "mtl-dieletric-box"
+    },
+    {
+      "id": "diffuse-wall",
+      "geometry": {
+        "type": "box",
+        "size": [2.5, 5.0, 10.0]
+      },
+      "position": [-6.25, 2.5, -0.75],
+      "material": "mtl-diffuse-wall"
+    },
+    {
+      "id": "diffuse-ceiling",
+      "geometry": {
+        "type": "plane",
+        "size": [10.0, 10.0]
+      },
+      "position": [0.0, 5.0, -0.75],
+      "rotation": [0.0, 1.0, 0.0, 0.0],
+      "material": "mtl-diffuse-ceiling"
     },
     {
       "id": "glass-ball",
@@ -168,13 +235,13 @@
         "type": "sphere",
         "radius": 0.75
       },
-      "position": [-1.0, 1.0, 0.0],
+      "position": [-1.0, 0.75, 0.0],
       "material": "mtl-glass-ball"
     },
     {
       "id": "light",
       "isLight": true,
-      "position": [0.0, 4.0, -2.0],
+      "position": [0.0, 4.99, -2.0],
       "rotation": [0.0, 1.0, 0.0, 0.0],
       "geometry": {
         "type": "plane",

@@ -8,7 +8,6 @@
 #include <obj_loader.h>
 #include <rt.h>
 #include <helper/axis_helper.h>
-
 #include "lib/shaders/rt_structure.h"
 
 #include <imgui.h>
@@ -16,6 +15,7 @@
 #include <imgui_impl_opengl3.h>
 #include <perlin_noise.hpp>
 #include <tinyfiledialogs.h>
+#include <stb_image_write.h>
 
 #include <iostream>
 
@@ -235,35 +235,45 @@ public:
                     if (!rtRenderer.has_value()) {
                         rtRenderer.emplace();
                     }
-                    rtRenderer->init(1024, 576);
+                    if (cpuRendering) {
+                        rtRenderer->initCPU(320, 180);
+                    } else {
+                        rtRenderer->initCL(1024, 576);
+                    }
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
                     use_ray_tracing = true;
                 }
             }
 
+            ImGui::SameLine();
             if (ImGui::Button("reload shader")) {
                 if (rtRenderer.has_value()) {
                     rtRenderer.value().reloadShader();
                 }
             }
 
-            if (ImGui::Button("debug")) {
-                float pixel_x = 0.0f;
-                float pixel_y = 0.0f;
-                float near = camera.near();
-                float fov = camera.fov() / 180.f * math::pi<float>();
-                float ndc_x = (pixel_x / windowWidth()) * 2.0f - 1.0f;
-                float ndc_y = (pixel_y / windowHeight()) * 2.0f - 1.0f;
-                float aspect = (float) windowWidth() / (float) windowHeight();
-                float top = near * tan(fov / 2);
-                auto near_pos = glm::vec3{ndc_x * top * aspect, ndc_y * top, -near};
-                auto cameraX = glm::cross(camera.lookDir(), camera.up());
-                auto cameraY = glm::cross(cameraX, camera.lookDir());
-                auto cameraZ = -camera.lookDir();
-                auto world_pos = near_pos.x * cameraX + near_pos.y * cameraY + near_pos.z * cameraZ + camera.position();
-                currentScene().addChild(
-                    new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<SphereGeometry>(0.05f)));
+            if (ImGui::Button("export")) {
+                if (use_ray_tracing && rtRenderer.has_value()) {
+                    int rtWidth = rtRenderer->width();
+                    int rtHeight = rtRenderer->height();
+                    int pixels = rtWidth * rtHeight;
+                    std::vector<uint8_t> fbData(pixels * 4);
+                    const float *data = rtRenderer->frameBufferData();
+                    for (int y = 0; y < rtHeight; ++y) {
+                        for (int x = 0; x < rtWidth; ++x) {
+                            int offset = ((rtHeight - y - 1) * rtWidth + x) * 4;
+                            for (int i = 0; i < 3; ++i) {
+                                // gamma correction and clamping
+                                fbData[(y * rtWidth + x) * 4 + i] = static_cast<uint8_t>(
+                                    std::clamp(static_cast<int>(round(pow(data[offset + i], 1.0 / 2.2) * 255)), 0, 255)
+                                );
+                            }
+                            fbData[offset + 3] = 255;
+                        }
+                    }
+                    stbi_write_png("output.png", rtWidth, rtHeight, 4, fbData.data(), rtWidth * 4);
+                }
             }
 
             ImGui::Text("filters");

@@ -7,7 +7,11 @@
 #include <shader.h>
 #include "lib/shaders/rt_structure.h"
 
+#ifdef USECL
+
 #include <cl.hpp>
+
+#endif
 
 #include <optional>
 #include <random>
@@ -45,18 +49,16 @@ class RayTracingRenderer {
     } ShaderParams;
     inline static std::optional<ShaderParams> trivialShader;
 
+#ifdef USECL
     cl::Platform platform;
     cl::Device device;
     cl::Context context;
     cl::CommandQueue commandQueue;
-    cg::Texture texture;
 
     bool clInited = false;
-
-    bool initCL();
-
     bool programInited = false;
-    bool sceneBufferNeedUpdate = true;
+
+    bool initCLDevice();
 
     cl::Program program;
     cl::Kernel testKernel;
@@ -65,7 +67,6 @@ class RayTracingRenderer {
     cl::Kernel accumulateKernel;
     cl::Kernel clearKernel;
 
-    uint _width{}, _height{};
     cl::Buffer rayBuffer;
     cl::Buffer seedBuffer;
     cl::Buffer accumulateBuffer;
@@ -77,7 +78,13 @@ class RayTracingRenderer {
     cl::Buffer materialBuffer;
     cl::Buffer bvhBuffer;
     cl::Buffer lightBuffer;
+#endif
 
+    bool sceneBufferNeedUpdate = true;
+
+    int _width{}, _height{};
+
+    cg::Texture texture;
     std::vector<float> accumulateFrameBuffer;
     std::vector<float> frameBuffer;
 
@@ -95,26 +102,40 @@ class RayTracingRenderer {
     std::default_random_engine engine{r()};
 
     // raytracing config
-    uint bounces = 4;
+    uint bounces = 5;
 
     size_t frameBufferSize() const {
         return frameBuffer.size() * sizeof(float);
     }
 
+    void initFrameBuffer(int width, int height);
+
     void drawFrameBuffer();
 
 public:
-    bool init(int width, int height);
+#ifdef USECL
+
+    bool initCL(int width, int height);
+
+    void render(RayTracingScene &scene, Camera &camera);
 
     bool reloadShader();
 
-    void render(RayTracingScene &scene, Camera &camera);
+#endif
+
+    bool initCPU(int width, int height);
 
     void renderCPU(RayTracingScene &scene, Camera &camera);
 
     void setBounces(uint newBounces);
 
-    int sampleCount() const;
+    const float *frameBufferData() const noexcept;
+
+    int sampleCount() const noexcept;
+
+    int width() const noexcept;
+
+    int height() const noexcept;
 };
 }
 

@@ -18,7 +18,7 @@ bool intersect(Ray ray, Triangle triangle, Intersection *intersection) {
 
     float3 pvec = cross(ray.direction, e02);
     float det = dot(e01, pvec);
-    if (fabs(det) < 1e-5) return false;
+    if (fabs(det) < 1e-5f) return false;
     float invDet = 1 / det;
 
     float3 tvec = ray.origin - triangle.v0.position;
@@ -95,7 +95,7 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
     stack[0] = 0;
     uint stackSize = 1;
     Intersection intersection;
-    float maxT = 1e20;
+    float maxT = 1e20f;
     float mss = 0.0f;
     bool hasIntersection = false;
     while (stackSize) {
@@ -104,13 +104,15 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
         BVHNode node = bvh[nodeIdx];
         if (node.isLeaf) {
             if (intersect(ray, primitives[node.offset], &intersection)) {
-                if (intersection.distance > 1e-5 && intersection.distance < maxT) {
+                if (intersection.distance < 1e-5f) {
+
+                } else if (intersection.distance < maxT) {
                     maxT = intersection.distance;
                     intersection.index = node.offset;
                     intersection.position = ray.origin + ray.direction * intersection.distance;
                     *output = intersection;
+                    hasIntersection = true;
                 }
-                hasIntersection = true;
             }
         } else {
             int sign[3];
@@ -220,9 +222,11 @@ __kernel void render_kernel(
             float3 emission;
             float3 transmission;
             float3 debug;
+            uint primitiveIndex;
             float ior;
             bool isSky;
             bool canReachLight;
+            bool side;
         } stack[16];
         int bounceCount = 0;
         Intersection intersection;
@@ -230,11 +234,21 @@ __kernel void render_kernel(
         for (uint i = 0; i <= bounces; ++i) {
             bounceCount += 1;
             if (firstIntersection(ray, bvh, triangles, &intersection)) {
+                if (i && stack[i - 1].primitiveIndex == intersection.index) {
+                    // discard self-intersection
+                    break;
+                }
                 float3 wo = -ray.direction;
                 float3 pos = intersection.position;
+                stack[i].debug = vec3(0.0f);
+                stack[i].side = intersection.side;
                 stack[i].position = pos;
+                stack[i].primitiveIndex = intersection.index;
 
                 Triangle triangle = triangles[intersection.index];
+                float3 te01 = triangle.v1.position - triangle.v0.position;
+                float3 te02 = triangle.v2.position - triangle.v0.position;
+                float3 triangleNormal = normalize(cross(te01, te02));
                 float3 normal = normalize(
                     triangle.v0.normal * intersection.barycentric.x +
                     triangle.v1.normal * intersection.barycentric.y +
@@ -278,7 +292,7 @@ __kernel void render_kernel(
                         && !lightRayIntersection.side
                         && lightRayIntersection.index == triangleIdx) {
                         float3 brdf = BRDF(lightRay.direction, -ray.direction, normal, material.roughness,
-                            diffuseColor, specularF0);
+                            diffuseColor, specularF0, 1.0f);
                         stack[i].light = materials[lightTriangle.mtlIndex].emission
                                          * fabs(dot(lightTriangle.v0.normal, -lightRay.direction))
                                          / length(lightPos - pos)
@@ -297,57 +311,75 @@ __kernel void render_kernel(
 
                 // TODO: fresnel
 
-                float currentIor = i ? stack[i - 1].ior : (intersection.side ? material.ior : 1.0f); // correct ior
-                float inboundIor = intersection.side ? material.ior : 1.0f; // possibly wrong
-                stack[i].ior = currentIor;
-                float R0 = pow2((currentIor - inboundIor) / (currentIor + inboundIor));
-                float Rtheta = R0 + (1.0f - R0) * pow5(1.0f - dot(wo, normal)); // fresnel reflection
-
-                float specularChance = clamp(material.metallic, 0.04f, 1.0f);
-                float refractionChance = (1.0f - specularChance) * material.specTrans;
-                float diffuseChance = 1.0f - specularChance - refractionChance;
+                float metallicChance = clamp(material.metallic, 0.04f, 1.0f);
+                float refractionChance = (1.0f - metallicChance) * material.specTrans;
+                float diffuseChance = 1.0f - metallicChance - refractionChance;
 
                 float ev = randomFloat(&seed);
                 float3 wi;
-                if (ev < diffuseChance) {
+                float wo_ior = intersection.side ? material.ior : (i ? stack[i - 1].ior : 1.0f);
+                float wi_ior = intersection.side ? 1.0f : material.ior; // might be wrong
+                float next_ior = wo_ior; // if reflection
+                float nn = wo_ior / wi_ior;
+                if (ev < metallicChance) {
+                    // specular reflection
+                    float pdf;
+                    wi = metallicBRDFSample(normal, wo, material.roughness, &pdf, &seed);
+                    stack[i].transmission = MetallicBRDF(wi, wo, normal, material.roughness, baseColor)
+                                            * dot(wi, normal) / pdf / metallicChance * material.metallic;
+                } else if (ev < diffuseChance + metallicChance) {
                     // diffuse
                     float pdf;
                     wi = cosineWeightedHemisphereSample(normal, &pdf, &seed);
-                    stack[i].transmission = DiffuseBRDF(wi, wo, normal, material.roughness, diffuseColor)
-                                            * dot(wi, normal) / pdf / diffuseChance;
-                } else if (ev < diffuseChance + specularChance) {
-                    // specular
-                    float pdf;
-                    wi = specularBRDFSample(normal, wo, material.roughness, &pdf, &seed);
-                    stack[i].transmission = SpecularBRDF(wi, wo, normal, material.roughness, specularF0)
-                                            * dot(wi, normal) / pdf / specularChance * (1.0f - material.specTrans);
+                    stack[i].transmission = DiffuseBRDF(wi, wo, normal, material.roughness, diffuseColor, nn)
+                                            * dot(wi, normal) / pdf / diffuseChance * (1.0f - material.specTrans);
                 } else {
-                    // refraction
-                    float wo_ior = i ? stack[i - 1].ior : (intersection.side ? material.ior : 1.0f);
-                    float wi_ior = intersection.side ? 1.0f : material.ior; // might be wrong, FIXME
-                    float nn = wo_ior / wi_ior;
-                    float VdotN = dot(wo, normal);
-                    float sin_wo_n_2 = 1.0f - pow2(VdotN);
-                    float sin_wi_n_2 = nn * nn * sin_wo_n_2;
-                    if (sin_wi_n_2 >= 1) {
-                        // total reflection
-                        wi_ior = wo_ior;
-                        wi = reflect(wo, normal);
-                        stack[i].transmission = SpecularBRDF(wi, wo, normal, material.roughness, specularF0)
-                                                * dot(wi, normal) / 1.0f / refractionChance * material.specTrans;
-                    } else {
-                        // pure specular refraction
-                        float cos_wi_n = sqrt(1.0f - sin_wi_n_2);
-                        wi = -nn * wo + (nn * VdotN - cos_wi_n) * normal;
-                        stack[i].transmission = SpecularBSDF(wi, wo, normal, material.roughness, baseColor, nn)
-                                                * fabs(dot(wi, normal)) / 1.0f / refractionChance;
-                    }
-                    stack[i].ior = wi_ior;
-                }
-                stack[i].debug = vec3(diffuseChance, refractionChance, 0.0f);
-//                stack[i].debug = stack[i].transmission;
+                    // (perfecct) refraction
+                    // use normal as H
+                    float VdotH = dot(wo, normal);
+                    float sinVH = 1.0f - pow2(VdotH);
+                    float sinLH2 = nn * nn * sinVH;
 
-                ray.origin = pos + wi;
+                    float reflectionChance = 0.0f;
+                    if (sinLH2 >= 1) {
+                        reflectionChance = 1.0f;
+                        // total reflection
+                        wi = reflect(wo, normal);
+                        next_ior = wo_ior;
+                        stack[i].transmission = diffuseColor * dot(wi, normal)
+                                                / 1.0f / refractionChance * material.specTrans;
+                    } else {
+                        float cosLH = sqrt(1.0f - sinLH2);
+                        float R0 = pow2((nn - 1.0f) / (nn + 1.0f));
+                        float Fs = mix(R0, 1.0f, pow5(1.0f - cosLH));
+
+                        if (randomFloat(&seed) < Fs) {
+                            // pure specular reflection
+                            next_ior = wo_ior;
+                            wi = reflect(wo, normal);
+                            stack[i].transmission = diffuseColor * dot(wi, normal)
+                                                    / Fs / refractionChance * material.specTrans;
+                        } else {
+                            // pure specular refraction
+                            next_ior = wi_ior;
+                            wi = -nn * wo + (nn * VdotH - VdotH) * normal;
+
+                            stack[i].transmission = diffuseColor * fabs(dot(wi, normal))
+                                                    / (1.0f - Fs) / refractionChance * material.specTrans;
+                            stack[i].debug = vec3(1.0f);
+                        }
+//                        stack[i].transmission = vec3(0.0f);
+                    }
+                }
+//                stack[i].debug = vec3(clamp(intersection.distance * 0.25f, 0.0f, 1.0f));
+//                stack[i].debug = vec3(0.0f, intersection.side ? 1.0f : 0.0f, intersection.side ? 0.0f : 1.0f);
+//                stack[i].debug = intersection.barycentric;
+//                stack[i].debug = normal * 0.5f + 0.5f;
+                stack[i].ior = next_ior;
+//                stack[i].debug = wi * 0.5f + 0.5f;
+//                stack[i].debug = vec3(0.5f, 0.5f, next_ior * 0.5f);
+
+                ray.origin = pos;
                 ray.direction = wi;
                 stack[i].isSky = false;
             } else {
@@ -367,7 +399,8 @@ __kernel void render_kernel(
                 radiance += stack[i].light;
                 if (i == 0) {
                     // to make light sources visible: direction illumination into camera
-                    radiance += stack[i].emission;
+                    // clamp to [0.0, 1.0] for anti-aliasing
+                    radiance += min(stack[i].emission, 1.0f);
                 }
             }
         }
@@ -376,19 +409,16 @@ __kernel void render_kernel(
             radiance = vec3(0.0f);
 //            radiance = vec3(0.7f, 0.75f, 1.0f);
         } else {
-            radiance = stack[0].debug;
-//            int t = 5;
-//            if (bounceCount > t)
-//                radiance = stack[t].transmission; // * 0.5f + 0.5f;
-//            else radiance = vec3(0.0f);
+//            int t = 0;
+//            if (!stack[t].isSky) {
+//                radiance = stack[t].debug;
+//            } else {
+//                radiance = vec3(0.0f);
+//            }
         }
         if (isfinite(radiance.x) && isfinite(radiance.y) && isfinite(radiance.z)) {
             sum += radiance;
         }
-//        if (sampleId == 1) {
-//            sum = stack[0].debug;
-//            break;
-//        }
     }
     globalSeed[pixelId] = seed;
     output[pixelId] += vec4(sum, (float) spp);

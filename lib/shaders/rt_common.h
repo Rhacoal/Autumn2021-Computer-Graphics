@@ -3,7 +3,6 @@
 
 #ifdef __cplusplus
 
-#include <cl.hpp>
 #include <simcl.h>
 
 #define CPP_INLINE inline
@@ -64,14 +63,14 @@ CPP_INLINE float3 cosineWeightedHemisphereSample(float3 normal, float *pdf, ulon
 
     // cosine-weighted hemisphere sampling
     float3 temp = fabs(normal.x) > 0.1f ? vec3(0.0f, 1.0f, 0.0f) : vec3(1.0f, 0.0f, 0.0f);
-    *pdf = max(y * RT_M_1_PI_F, 0.01f * RT_M_1_PI_F);
+    *pdf = y * RT_M_1_PI_F;
     float3 u = normalize(cross(temp, normal));
     float3 v = cross(normal, u);
 
     return u * x + normal * y + v * z;
 }
 
-CPP_INLINE float3 specularBRDFSample(float3 normal, float3 wo, float roughness, float *pdf, ulong *seed) {
+CPP_INLINE float3 metallicBRDFSample(float3 normal, float3 wo, float roughness, float *pdf, ulong *seed) {
     if (roughness < 1e-5) {
         // perfect reflection
         // need divide by distance
@@ -79,6 +78,10 @@ CPP_INLINE float3 specularBRDFSample(float3 normal, float3 wo, float roughness, 
         return reflect(wo, normal);
     }
     return cosineWeightedHemisphereSample(normal, pdf, seed);
+}
+
+CPP_INLINE float3 surfaceGGXSample(float3 normal, float3 wo, float roughness, float eta, float *pdf, ulong *seed) {
+    
 }
 
 #endif //ASSIGNMENT_RT_COMMON_H

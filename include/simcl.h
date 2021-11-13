@@ -1,7 +1,42 @@
 #ifndef ASSIGNMENT_SIMCL_H
 #define ASSIGNMENT_SIMCL_H
 
+#ifdef USECL
 #include <cl.hpp>
+#else
+
+typedef float cl_float;
+
+typedef union {
+    cl_float s[2];
+    struct {
+        cl_float x, y;
+    };
+    struct {
+        cl_float s0, s1;
+    };
+    struct {
+        cl_float lo, hi;
+    };
+} cl_float2;
+
+typedef union {
+    cl_float s[4];
+    struct {
+        cl_float x, y, z, w;
+    };
+    struct {
+        cl_float s0, s1, s2, s3;
+    };
+    struct {
+        cl_float2 lo, hi;
+    };
+    cl_float2     v2[2];
+} cl_float4;
+
+typedef cl_float4 cl_float3;
+#endif
+
 #include <glm/glm.hpp>
 
 #include <cmath>
@@ -27,10 +62,6 @@ inline uint get_global_id(uint dimindx) {
     return workItemId[dimindx];
 }
 
-inline float4 min(const float4 &a, const float4 &b) {
-    return float4{std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z), std::min(a.w, b.w)};
-}
-
 inline float max(float a, float b) {
     return std::max(a, b);
 }
@@ -41,6 +72,26 @@ inline float min(float a, float b) {
 
 inline float4 max(const float4 &a, const float4 &b) {
     return float4{std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z), std::max(a.w, b.w)};
+}
+
+inline float4 min(const float4 &a, const float4 &b) {
+    return float4{std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z), std::min(a.w, b.w)};
+}
+
+inline float4 max(const float4 &a, float b) {
+    return float4{std::max(a.x, b), std::max(a.y, b), std::max(a.z, b), std::max(a.w, b)};
+}
+
+inline float4 min(const float4 &a, float b) {
+    return float4{std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.w, b)};
+}
+
+inline float4 max(float a, const float4& b) {
+    return float4{std::max(a, b.x), std::max(a, b.y), std::max(a, b.z), std::max(a, b.w)};
+}
+
+inline float4 min(float a, const float4& b) {
+    return float4{std::min(a, b.x), std::min(a, b.y), std::min(a, b.z), std::min(a, b.w)};
 }
 
 inline float4 operator-(const float4 &lhs, const float4 &rhs) {
@@ -189,7 +240,8 @@ inline float clamp(float v, float minValue, float maxValue) {
 }
 
 inline float3 clamp(float3 v, float3 minValue, float3 maxValue) {
-    return float3{clamp(v.x, minValue.x, maxValue.x), clamp(v.y, minValue.y, maxValue.y), clamp(v.z, minValue.z, maxValue.z)};
+    return float3{clamp(v.x, minValue.x, maxValue.x), clamp(v.y, minValue.y, maxValue.y),
+                  clamp(v.z, minValue.z, maxValue.z)};
 }
 
 inline float3 clamp(float3 v, float minValue, float maxValue) {

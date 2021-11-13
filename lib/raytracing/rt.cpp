@@ -6,7 +6,6 @@
 #include <mesh.h>
 #include "lib/shaders/rt_definition.h"
 
-#include <cl.hpp>
 #include <tinyfiledialogs.h>
 
 #include <vector>
@@ -191,8 +190,8 @@ struct CPUDispatcher {
 };
 
 void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &camera) {
-    // no need to init cl first
-    // TODO init texture buffer
+    // no need to initCL cl first
+    // TODO initCL texture buffer
 //    auto textureMemBuffer = nullptr;
     auto triangleMemBuffer = scene.triangles.data();
     auto materialMemBuffer = scene.materials.data();
@@ -237,11 +236,14 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
     drawFrameBuffer();
 }
 
+#ifdef USECL
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // update buffers (if needed)
     bool needClear = false;
     int err;
     if (scene.bufferNeedUpdate || sceneBufferNeedUpdate) {
+        needClear = true;
+
         // TODO actually fill in these buffers
         // textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
         triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -296,7 +298,6 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
 
         scene.bufferNeedUpdate = false;
         sceneBufferNeedUpdate = false;
-        needClear = true;
 
         printf("Scene inited for RT");
     }
@@ -342,6 +343,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     );
     std::vector<cl::Event> preRenderEvents = {rayGen};
     if (needClear) {
+        puts("Clear color buffer.");
         cl::Event ev;
         err = commandQueue.enqueueNDRangeKernel(clearKernel, cl::NullRange, _width * _height, cl::NullRange, nullptr,
             &ev);
@@ -351,7 +353,6 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     err = commandQueue.enqueueNDRangeKernel(
         renderKernel, cl::NullRange, _width * _height, cl::NullRange, &preRenderEvents, raytracingEvent.data()
     );
-    err = raytracingEvent[0].wait();
     std::vector<cl::Event> accumulateEvent(1);
     err = commandQueue.enqueueNDRangeKernel(
         accumulateKernel, cl::NullRange, _width * _height, cl::NullRange, &raytracingEvent, accumulateEvent.data()
@@ -364,19 +365,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     drawFrameBuffer();
 }
 
-void cg::RayTracingRenderer::drawFrameBuffer() {
-    texture.setData(_width, _height, GL_RGB32F, GL_RGBA, GL_FLOAT, frameBuffer.data());
-    if (!trivialShader.has_value()) {
-        trivialShader.emplace();
-    }
-    check_err(trivialShader->use());
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture.tex());
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
-}
-
-bool cg::RayTracingRenderer::initCL() {
+bool cg::RayTracingRenderer::initCLDevice() {
     if (clInited) return true;
     // Get all available OpenCL platforms (e.g. AMD OpenCL, Nvidia CUDA, Intel OpenCL)
     std::vector<cl::Platform> platforms;
@@ -448,8 +437,8 @@ bool cg::RayTracingRenderer::initCL() {
     return true;
 }
 
-bool cg::RayTracingRenderer::init(int width, int height) {
-    initCL();
+bool cg::RayTracingRenderer::initCL(int width, int height) {
+    initCLDevice();
     if (!programInited) {
         if (!reloadShader()) {
             return false;
@@ -457,17 +446,9 @@ bool cg::RayTracingRenderer::init(int width, int height) {
         programInited = true;
     }
     if (width != _width || height != _height) {
+        initFrameBuffer(width, height);
         _width = width;
         _height = height;
-        // prepare buffers
-        frameBuffer.resize(_width * _height * 4);
-        std::fill(frameBuffer.begin(), frameBuffer.end(), 0.5f);
-        seedMemBuffer.resize(_width * _height * 4);
-        std::uniform_int_distribution<ulong> distribution;
-        for (ulong &ul: seedMemBuffer) {
-            ul = distribution(engine);
-        }
-
         int err;
         rayBuffer = cl::Buffer(context, CL_MEM_READ_WRITE, width * height * spp * sizeof(float4), nullptr, &err);
         seedBuffer = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, width * height * sizeof(ulong),
@@ -499,13 +480,59 @@ bool cg::RayTracingRenderer::reloadShader() {
     clearKernel = cl::Kernel(program, "clear_kernel");
     return true;
 }
+#endif
+
+void cg::RayTracingRenderer::drawFrameBuffer() {
+    texture.setData(_width, _height, GL_RGB32F, GL_RGBA, GL_FLOAT, frameBuffer.data());
+    if (!trivialShader.has_value()) {
+        trivialShader.emplace();
+    }
+    check_err(trivialShader->use());
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture.tex());
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
 
 void cg::RayTracingRenderer::setBounces(uint newBounces) {
     this->bounces = std::clamp(newBounces, uint(1), uint(15));
 }
 
-int cg::RayTracingRenderer::sampleCount() const {
+const float *cg::RayTracingRenderer::frameBufferData() const noexcept {
+    return frameBuffer.data();
+}
+
+int cg::RayTracingRenderer::sampleCount() const noexcept {
     return samples;
+}
+
+void cg::RayTracingRenderer::initFrameBuffer(int width, int height) {
+    if (width != _width || height != _height) {
+        _width = width;
+        _height = height;
+        // prepare buffers
+        frameBuffer.resize(_width * _height * 4);
+        seedMemBuffer.resize(_width * _height * 4);
+        std::uniform_int_distribution<ulong> distribution;
+        for (ulong &ul: seedMemBuffer) {
+            ul = distribution(engine);
+        }
+    }
+}
+
+bool cg::RayTracingRenderer::initCPU(int width, int height) {
+    initFrameBuffer(width, height);
+    _width = width;
+    _height = height;
+    return true;
+}
+
+int cg::RayTracingRenderer::height() const noexcept {
+    return _height;
+}
+
+int cg::RayTracingRenderer::width() const noexcept {
+    return _width;
 }
 
 template<typename ...Args>

@@ -39,6 +39,13 @@ if (CMAKE_BINARY_DIR MATCHES " ")
     message("Your Build Directory contains spaces. If you experience problems when compiling, this can be the cause.")
 endif ()
 
+SET(CMAKE_C_USE_RESPONSE_FILE_FOR_OBJECTS 1)
+SET(CMAKE_CXX_USE_RESPONSE_FILE_FOR_OBJECTS 1)
+
+SET(CMAKE_C_RESPONSE_FILE_LINK_FLAG "@")
+SET(CMAKE_CXX_RESPONSE_FILE_LINK_FLAG "@")
+
+SET(CMAKE_NINJA_FORCE_RESPONSE_FILE 1 CACHE INTERNAL "")
 
 # Compile external dependencies
 add_subdirectory(external)
@@ -60,7 +67,6 @@ include_directories(
         external/glad/include/
         external/assimp-5.0.1/include/
         external/headeronly/
-        external/tinydialog-3.8.8/
         include/
         .
 )
@@ -70,6 +76,7 @@ set(ALL_LIBS
         glad
         glfw
         imgui
+        stb_image
         tinydialog
         assimp
         ${OpenCL_LIB}
@@ -82,6 +89,7 @@ add_definitions(
         -DTW_NO_DIRECT3D
         -D_CRT_SECURE_NO_WARNINGS
         -DGL_SILENCE_DEPRECATION
+        -DUSECL
 )
 
 add_executable(assignment
@@ -95,7 +103,6 @@ add_executable(assignment
         lib/scene3d/object3d.cpp
         lib/scene3d/renderer.cpp
         lib/shaders/raytracing.cpp
-        lib/stb_image_impl.cpp
         lib/util/shader.cpp
         lib/util/texture.cpp
         src/appmain.cpp

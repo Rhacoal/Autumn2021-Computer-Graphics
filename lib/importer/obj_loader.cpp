@@ -253,7 +253,7 @@ struct ObjLoader {
                 Texture::Encoding::LINEAR, Texture::DefaultTexture::DEFAULT_NORMAL);
             stdMtl->normalMap = normal.first;
             stdMtl->emission = getOrDefault(j, "emission", glm::vec3(0.0f));
-            stdMtl->ior = getOrDefault(j, "ior", 0.0f);
+            stdMtl->ior = getOrDefault(j, "ior", 1.0f);
             stdMtl->specTrans = getOrDefault(j, "specTrans", 0.0f);
             stdMtl->transparent = getOrDefault(j, "transparent", false);
             return stdMtl;

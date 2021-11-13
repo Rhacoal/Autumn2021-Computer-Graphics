@@ -32,6 +32,15 @@ add_library(imgui
         ${IMGUI_INCLUDE})
 target_include_directories(imgui PUBLIC imgui-1.85/include glfw-3.3.4/include)
 
+# stb_image
+file(GLOB STB_IMAGE_SRC stb_image/src/*.cpp)
+file(GLOB STB_IMAGE_INCLUDE stb_image/include/*.h)
+add_library(stb_image ${STB_IMAGE_SRC} ${STB_IMAGE_INCLUDE})
+target_include_directories(stb_image PUBLIC stb_image/include)
+
+# tinydialog
+add_library(tinydialog tinydialog-3.8.8/tinyfiledialogs.cpp tinydialog-3.8.8/tinyfiledialogs.h)
+target_include_directories(tinydialog PUBLIC tinydialog-3.8.8)
 
 ### ASSIMP ###
 # AssImp already has a CMakeLists.txt so let's use these
@@ -43,10 +52,6 @@ include(CheckFunctionExists)
 
 # Compile without Boost
 add_definitions(-DASSIMP_BUILD_BOOST_WORKAROUND)
-
-# tinydialog
-add_library(tinydialog tinydialog-3.8.8/tinyfiledialogs.cpp tinydialog-3.8.8/tinyfiledialogs.h)
-target_include_directories(tinydialog PUBLIC tinydialog-3.8.8)
 
 # Compile AssImp
 set(BUILD_SHARED_LIBS OFF)
