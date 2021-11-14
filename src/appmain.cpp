@@ -236,7 +236,7 @@ public:
                         rtRenderer.emplace();
                     }
                     if (cpuRendering) {
-                        rtRenderer->initCPU(320, 180);
+                        rtRenderer->initCPU(80, 45);
                     } else {
                         rtRenderer->initCL(1024, 576);
                     }
