@@ -40,14 +40,17 @@
       "id": "mtl-bunny",
       "type": "standard",
       "albedo": {
-        "color": [0.798, 0.003, 1.056]
+        "color": [1.0, 1.0, 1.0]
       },
       "metallic": {
-        "intensity": 1.0
+        "intensity": 0.0
       },
       "roughness": {
-        "intensity": 0.1
-      }
+        "intensity": 0.0
+      },
+      "ior": 1.33,
+      "transparent": true,
+      "specTrans": 1.0
     },
     {
       "id": "mtl-dragon",
@@ -104,7 +107,7 @@
         "intensity": 0.0
       },
       "transparent": true,
-      "ior": 1.33,
+      "ior": 1.5,
       "specTrans": 1.00
     },
     {
@@ -150,7 +153,13 @@
     {
       "id": "mtl-light",
       "type": "standard",
-      "emission": [5.0, 5.0, 5.0]
+      "emission": [5.0, 5.0, 5.0],
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 0.0
+      }
     }
   ],
   "objects": [
@@ -176,7 +185,7 @@
       "id": "bunny",
       "geometry": {
         "type": "file",
-        "file": "object/bun_zipper_res2.ply"
+        "file": "object/bun_zipper.ply"
       },
       "position": [0.0, -0.3, -2.5],
       "scale": [10.0, 10.0, 10.0],

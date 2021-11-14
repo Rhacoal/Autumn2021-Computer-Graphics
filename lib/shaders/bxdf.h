@@ -52,7 +52,7 @@ float luminance(float3 color) {
     return color.x * .6f + color.y * .3f + color.z * .1f;
 }
 
-float3 DiffuseBRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor, float eta) {
+float3 DiffuseBRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor) {
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
     if (NdotV <= 0.0f || NdotL <= 0.0f) return vec3(0.0f);
@@ -63,8 +63,6 @@ float3 DiffuseBRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuse
     float Fd90 = 0.5f + 2 * LdotH * LdotH * roughness;
     float Fd = mix(1.0f, Fd90, FL) * mix(1.0f, Fd90, FV);
     return RT_M_1_PI_F * Fd * diffuseColor;
-//    float Rtheta = DielectricFresnel(NdotL, eta);
-//    return RT_M_1_PI_F * Rtheta * diffuseColor;
 }
 
 float3 SpecularBRDF(float3 L, float3 V, float3 N, float roughness, float3 R0) {
@@ -79,11 +77,18 @@ float3 SpecularBRDF(float3 L, float3 V, float3 N, float roughness, float3 R0) {
     float FH = SchlickFresnel(LdotH);
     float3 Fs = mix(R0, vec3(1.0f), FH);
     float Gs = smithG_GGX(NdotV, a);
-    return clamp(Gs * Fs * Ds, 0.0f, 1.0f);
+    return Gs * Fs * Ds;
 }
 
-float3 BRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor, float3 specularF0, float eta) {
-    return DiffuseBRDF(L, V, N, roughness, diffuseColor, eta) + SpecularBRDF(L, V, N, roughness, specularF0);
+float3 BRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor, float3 specularR0) {
+    return min(DiffuseBRDF(L, V, N, roughness, diffuseColor) + SpecularBRDF(L, V, N, roughness, specularR0), 1.0f);
+}
+
+float3 MixedBRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor, float3 specularR0,
+                 float specTrans, float eta) {
+    float3 H = normalize(L + V);
+    return min(DiffuseBRDF(L, V, N, roughness, diffuseColor) * (1.0f - specTrans) * IorToR0(dot(V, H), eta)
+        + SpecularBRDF(L, V, N, roughness, specularR0), 1.0f);
 }
 
 #endif //ASSIGNMENT_BXDF_H

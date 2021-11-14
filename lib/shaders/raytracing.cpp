@@ -268,6 +268,11 @@ __kernel void render_kernel(
                 float3 specularF0 = mix(vec3(0.04f), baseColor, material.metallic);
                 float3 diffuseColor = baseColor * (1.0f - material.metallic);
 
+                float wo_ior = intersection.side ? material.ior : (i ? stack[i - 1].ior : 1.0f);
+                float wi_ior = intersection.side ? 1.0f : material.ior; // might be wrong
+                float next_ior = wo_ior; // if reflection
+                float eta = wo_ior / wi_ior;
+
                 // sample light
                 if (lightCount) {
                     uint i0 = randomInt(&seed, lightCount);
@@ -291,12 +296,13 @@ __kernel void render_kernel(
                     if (intersectLight
                         && !lightRayIntersection.side
                         && lightRayIntersection.index == triangleIdx) {
-                        float3 brdf = BRDF(lightRay.direction, -ray.direction, normal, material.roughness,
-                            diffuseColor, specularF0, 1.0f);
+                        float3 brdf = MixedBRDF(lightRay.direction, -ray.direction, normal, material.roughness,
+                            diffuseColor, specularF0, material.specTrans, eta);
                         stack[i].light = materials[lightTriangle.mtlIndex].emission
                                          * fabs(dot(lightTriangle.v0.normal, -lightRay.direction))
                                          / length(lightPos - pos)
                                          / (0.5f / length(cross(e01, e02))) // pdf_light
+                                         / (1.0f / lightCount)
                                          * brdf
                                          * dot(normal, lightRay.direction);
                         stack[i].canReachLight = true;
@@ -309,34 +315,25 @@ __kernel void render_kernel(
                     stack[i].canReachLight = false;
                 }
 
-                // TODO: fresnel
-
-//                float metallicChance = clamp(material.metallic, 0.04f, 1.0f);
                 float metallicChance = clamp(material.metallic, 0.0f, 1.0f);
                 float refractionChance = (1.0f - metallicChance) * material.specTrans;
                 float diffuseChance = 1.0f - metallicChance - refractionChance;
 
                 float ev = randomFloat(&seed);
                 float3 wi;
-                float wo_ior = intersection.side ? material.ior : (i ? stack[i - 1].ior : 1.0f);
-                float wi_ior = intersection.side ? 1.0f : material.ior; // might be wrong
-                float next_ior = wo_ior; // if reflection
-                float nn = wo_ior / wi_ior;
                 if (ev < metallicChance) {
                     // specular reflection
                     float pdf;
                     wi = metallicBRDFSample(normal, wo, material.roughness, &pdf, &seed);
-                    stack[i].transmission = SpecularBRDF(wi, wo, normal, material.roughness, specularF0)
+                    stack[i].transmission = BRDF(wi, wo, normal, material.roughness, diffuseColor, specularF0)
                                             * dot(wi, normal) / pdf / metallicChance;
                 } else if (ev < diffuseChance + metallicChance) {
                     // diffuse
                     float pdf;
                     wi = cosineWeightedHemisphereSample(normal, &pdf, &seed);
-                    float R0 = IorToR0(dot(wi, normalize(wi + wo)), nn);
-                    float3 diffuse = DiffuseBRDF(wi, wo, normal, material.roughness, diffuseColor, nn);
-                    float3 specular = SpecularBRDF(wi, wo, normal, material.roughness, diffuseColor * R0);
-                    stack[i].transmission = (diffuse + specular) * dot(wi, normal)
-                                            / pdf / diffuseChance; // * (1.0f - material.specTrans);
+                    float R0 = IorToR0(dot(wi, normalize(wi + wo)), eta);
+                    float3 brdf = BRDF(wi, wo, normal, material.roughness, diffuseColor, diffuseColor * R0);
+                    stack[i].transmission = brdf * dot(wi, normal) / pdf / diffuseChance * (1.0f - material.specTrans);
                 } else {
                     // (perfecct) refraction
                     // use normal as H
@@ -344,7 +341,7 @@ __kernel void render_kernel(
                     float VdotH = dot(wo, H);
                     VdotH = fabs(dot(wo, H));
                     float sinVH2 = 1.0f - pow2(VdotH);
-                    float sinLH2 = nn * nn * sinVH2;
+                    float sinLH2 = eta * eta * sinVH2;
 
                     float reflectionChance = 0.0f;
                     if (sinLH2 >= 1) {
@@ -355,7 +352,7 @@ __kernel void render_kernel(
                         stack[i].transmission = diffuseColor / refractionChance * material.specTrans;
                     } else {
                         float cosLH = sqrt(1.0f - sinLH2);
-                        float R0 = pow2((nn - 1.0f) / (nn + 1.0f));
+                        float R0 = pow2((eta - 1.0f) / (eta + 1.0f));
                         float Fs = mix(R0, 1.0f, pow5(1.0f - cosLH));
 
                         if (randomFloat(&seed) < Fs) {
@@ -367,7 +364,7 @@ __kernel void render_kernel(
                         } else {
                             // pure specular refraction
                             next_ior = wi_ior;
-                            wi = normalize(-nn * wo + (nn * VdotH - cosLH) * H);
+                            wi = normalize(-eta * wo + (eta * VdotH - cosLH) * H);
 
                             stack[i].transmission = diffuseColor / refractionChance * material.specTrans;
                         }
@@ -397,7 +394,7 @@ __kernel void render_kernel(
             if (stack[i].isSky) {
                 // TODO IBL sky
 //                radiance = vec3(0.0f, 0.023f, 0.1f);
-                radiance = vec3(0.6f, 0.6f, 0.6f);
+                radiance = vec3(0.0f, 0.0f, 0.0f);
             } else {
                 radiance *= stack[i].transmission;
                 radiance += stack[i].light;
@@ -411,11 +408,11 @@ __kernel void render_kernel(
 
         if (stack[0].isSky) {
 //            radiance = vec3(0.0f);
-//            radiance = vec3(0.7f, 0.75f, 1.0f);
+//            radiance = vec3(0.83f, 0.85f, 1.0f);
         } else {
-//            int t = 1;
+//            int t = 0;
 //            if (!stack[t].isSky) {
-//                radiance = stack[t].debug;
+//                radiance = stack[t].transmission;
 //            } else {
 //                radiance = vec3(0.0f);
 //            }

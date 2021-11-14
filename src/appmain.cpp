@@ -73,7 +73,7 @@ class AppMain : public cg::Application {
     double lastMouseX = .0, lastMouseY = .0;
     double deltaX = .0, deltaY = .0;
     bool receiveMouseMovement = false;
-    bool showCursor = false;
+    bool showCursor = true;
     bool rightButtonClicked = false;
 
     // shoot object
@@ -127,7 +127,7 @@ public:
         currentScene().addChild(new AxisHelper({1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 5));
 
         // control
-        glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+//        glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPosCallback(window(), [](GLFWwindow *, double mouseX, double mouseY) {
             auto &app = *appMain;
             if (app.showCursor) {
@@ -238,7 +238,7 @@ public:
                     if (cpuRendering) {
                         rtRenderer->initCPU(80, 45);
                     } else {
-                        rtRenderer->initCL(1024, 576);
+                        rtRenderer->initCL(1920, 1080);
                     }
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
@@ -421,15 +421,15 @@ public:
         // update showCursor here since delta would not be have been calculated until next update
         if (glfwGetKey(window(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
             glfwGetKey(window(), GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
+            if (showCursor) {
+                glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                showCursor = false;
+            }
+        } else {
             if (!showCursor) {
                 glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                 glfwSetCursorPos(window(), windowWidth() / 2.0, windowHeight() / 2.0);
                 showCursor = true;
-            }
-        } else {
-            if (showCursor) {
-                glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                showCursor = false;
             }
         }
     }
