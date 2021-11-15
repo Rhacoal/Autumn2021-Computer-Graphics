@@ -32,9 +32,19 @@ public:
 
     Texture &operator=(const Texture &rhs) = default;
 
+    int width() const;
+
+    int height() const;
+
     void generate(int width, int height, GLint internalFormat);
 
     void setData(int width, int height, GLint internalFormat, GLenum format, GLenum type, const void *data);
+
+    const float *data() const;
+
+    std::vector<float>::const_iterator begin() const;
+
+    std::vector<float>::const_iterator end() const;
 
     static Texture defaultTexture(DefaultTexture defaultTexture);
 

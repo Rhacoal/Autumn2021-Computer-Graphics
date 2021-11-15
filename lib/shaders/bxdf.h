@@ -72,7 +72,7 @@ float3 SpecularBRDF(float3 L, float3 V, float3 N, float roughness, float3 R0) {
     float3 H = normalize(L + V);
     float LdotH = dot(L, H);
     float NdotH = dot(N, H);
-    float a = max(.001f, sqr(roughness));
+    float a = max(.01f, sqr(roughness));
     float Ds = GTR2(NdotH, a);
     float FH = SchlickFresnel(LdotH);
     float3 Fs = mix(R0, vec3(1.0f), FH);

@@ -223,6 +223,10 @@ inline float3 vec3(float a, float b, float c) {
     return float3{a, b, c};
 }
 
+inline float3 vec3(float2 a, float b) {
+    return float3{a.x, a.y, b};
+}
+
 inline float4 vec4(float a) {
     return float4{a, a, a, a};
 }

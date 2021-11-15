@@ -117,8 +117,8 @@ public:
 //        currentScene().addChild(dirLight);
 
         // camera
-        camera.setPosition(glm::vec3(1.59f, 2.50f, 5.84f));
-        camera.lookToDir(glm::vec3(-0.21f, -0.14f, -0.97f));
+        camera.setPosition(glm::vec3(4.7f, 2.8f, 4.7f));
+        camera.lookToDir(glm::vec3(-0.71f, -0.02f, -0.71f));
 
         // bullet
         bullet = new Mesh(std::make_shared<PhongMaterial>(), std::make_shared<BoxGeometry>(0.5f, 0.5f, 5.0f));
@@ -236,9 +236,9 @@ public:
                         rtRenderer.emplace();
                     }
                     if (cpuRendering) {
-                        rtRenderer->initCPU(80, 45);
+                        rtRenderer->initCPU(160, 90);
                     } else {
-                        rtRenderer->initCL(1920, 1080);
+                        rtRenderer->initCL(3840, 2160);
                     }
                     rtRendererScene.setFromScene(currentScene());
                     puts("ray tracing set");
@@ -493,7 +493,7 @@ int main(int argc, const char **argv) {
     app.start(cg::ApplicationConfig{
         .window =  {
             .width = 1024, .height = 576,
-            .title = "Assignment 2"
+            .title = "Assignment 3"
         }
     });
     return 0;

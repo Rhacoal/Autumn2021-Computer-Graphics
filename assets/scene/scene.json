@@ -46,7 +46,7 @@
         "intensity": 1.0
       },
       "roughness": {
-        "intensity": 0.2
+        "intensity": 0.1
       }
     },
     {
@@ -126,7 +126,7 @@
       "id": "mtl-diffuse-wall",
       "type": "standard",
       "albedo": {
-        "color": [0.4, 1.0, 0.5]
+        "texture": "material/wall.png"
       },
       "metallic": {
         "intensity": 0.0
@@ -153,10 +153,10 @@
       "type": "standard",
       "emission": [5.0, 5.0, 5.0],
       "metallic": {
-        "intensity": 1.0
+        "intensity": 0.0
       },
       "roughness": {
-        "intensity": 0.0
+        "intensity": 1.0
       }
     }
   ],
@@ -178,16 +178,6 @@
       },
       "position": [-3.0, 2.0, -3.75],
       "material": "mtl-ball"
-    },
-    {
-      "id": "bunny",
-      "geometry": {
-        "type": "file",
-        "file": "object/bun_zipper.ply"
-      },
-      "position": [2.0, -0.5, -3.5],
-      "scale": [15.0, 15.0, 15.0],
-      "material": "mtl-bunny"
     },
     {
       "id": "glossy-mirror",
@@ -220,10 +210,11 @@
     {
       "id": "diffuse-wall",
       "geometry": {
-        "type": "box",
-        "size": [2.5, 5.0, 10.0]
+        "type": "plane",
+        "size": [5.0, 10.0]
       },
-      "position": [-6.25, 2.5, -0.75],
+      "position": [-5, 2.5, -0.75],
+      "rotation": [-0.70710678, 0.0, 0.0, 0.70710678],
       "material": "mtl-diffuse-wall"
     },
     {
@@ -244,6 +235,16 @@
       },
       "position": [0.0, 0.75, 0.0],
       "material": "mtl-glass-ball"
+    },
+    {
+      "id": "bunny",
+      "geometry": {
+        "type": "file",
+        "file": "object/bun_zipper.ply"
+      },
+      "position": [2.0, -0.5, -3.5],
+      "scale": [15.0, 15.0, 15.0],
+      "material": "mtl-bunny"
     },
     {
       "id": "dragon",

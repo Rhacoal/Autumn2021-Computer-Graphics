@@ -3,7 +3,7 @@
 
 #include "lib/shaders/rt_common.h"
 
-#define MAP_NONE ((uint) 0x7fffffff)
+#define TEXTURE_NONE ((uint) 0x7fffffff)
 
 typedef struct RayTracingMaterial {
     float3 albedo;
@@ -19,8 +19,8 @@ typedef struct RayTracingMaterial {
 } RayTracingMaterial;
 
 typedef struct RayTracingTextureRange {
-    float2 pMin;
-    float2 pMax;
+    uint offset;
+    int width, height;
 } RayTracingTextureRange;
 
 typedef struct Vertex {

@@ -143,8 +143,53 @@ bool firstIntersection(Ray ray, __global BVHNode *bvh, __global Triangle *primit
     return hasIntersection;
 }
 
-RayTracingMaterial evaluateMaterial(__global RayTracingMaterial *material, float2 texcoord) {
-    return *material;
+void sample(float u, int width, int *x0, int *x1, float *p) {
+    u = u - floor(u);
+    float x = u * (float) width - 0.5f;
+    int px = (int) x;
+    *p = x - (float) px;
+    *x0 = px + (px < 0) * width;
+    *x1 = (px + 1) % width;
+}
+
+float4 sampleTexture(__global float4 *data, RayTracingTextureRange textureRange, float2 texcoord) {
+    int x0, y0, x1, y1;
+    float xp, yp;
+    int width = textureRange.width, height = textureRange.height;
+    sample(texcoord.x, width, &x0, &x1, &xp);
+    sample(texcoord.y, height, &y0, &y1, &yp);
+    return mix(
+        mix(data[x0 + y0 * width], data[x1 + y0 * width], xp),
+        mix(data[x0 + y1 * width], data[x1 + y1 * width], xp),
+        yp
+    );
+}
+
+RayTracingMaterial evaluateMaterial(__global RayTracingMaterial *material,
+                                    __global RayTracingTextureRange *textureRanges,
+                                    __global float4 *textures, float2 texcoord) {
+    RayTracingMaterial result = *material;
+    if (result.albedoMap != TEXTURE_NONE) {
+        float4 color = sampleTexture(textures + textureRanges[result.albedoMap].offset,
+            textureRanges[result.albedoMap], texcoord);
+#ifdef __cplusplus
+        result.albedo *= color;
+#else
+        result.albedo *= color.rgb;
+#endif
+    }
+    if (result.metallicMap != TEXTURE_NONE) {
+        result.metallic *= sampleTexture(textures + textureRanges[result.metallicMap].offset,
+            textureRanges[result.metallicMap], texcoord).x;
+        if (textureRanges[result.metallicMap].width > 2) {
+            debugger;
+        }
+    }
+    if (result.roughnessMap != TEXTURE_NONE) {
+        result.roughness *= sampleTexture(textures + textureRanges[result.roughnessMap].offset,
+            textureRanges[result.roughnessMap], texcoord).y;
+    }
+    return result;
 }
 
 __kernel void raygeneration_kernel(
@@ -196,7 +241,7 @@ __kernel void render_kernel(
     __global float4 *output, uint width, uint height,
     __global BVHNode *bvh, __global Triangle *triangles,
     __global RayTracingMaterial *materials,
-//    __global RayTracingTextureRange *textures, image2d_t textureImage,
+    __global RayTracingTextureRange *textures, __global float4 *textureImage,
     __global const uint *lights, uint lightCount,
     __global float3 *rays, float3 cameraPosition, uint bounces,
     __global ulong *globalSeed, uint spp
@@ -253,10 +298,14 @@ __kernel void render_kernel(
                     triangle.v2.texcoord * intersection.barycentric.z
                 );
 
-                RayTracingMaterial material = evaluateMaterial(materials + triangle.mtlIndex, texcoord);
+                RayTracingMaterial material = evaluateMaterial(materials + triangle.mtlIndex, textures,
+                    textureImage, texcoord);
                 if (!sampleLight && !intersection.side) {
                     radiance += transmission * material.emission;
                 }
+//                radiance = vec3(texcoord, 0.0f);
+////                radiance = normal * 0.5f + 0.5f;
+//                break;
 
                 float3 baseColor = material.albedo;
                 float3 specularF0 = mix(vec3(0.04f), baseColor, material.metallic);
@@ -278,7 +327,7 @@ __kernel void render_kernel(
                 if (ev < metallicChance) {
                     // specular reflection
                     float pdf;
-                    if (material.roughness == 0.0f)  {
+                    if (material.roughness == 0.0f) {
                         sampleLight = false;
                     }
                     wi = metallicBRDFSample(normal, wo, material.roughness, &pdf, &seed);

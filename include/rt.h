@@ -27,7 +27,8 @@ struct RayTracingScene {
     bool bufferNeedUpdate = true;
 
     BVH bvh;
-    std::vector<Texture> usedTextures;
+    std::vector<RayTracingTextureRange> textures;
+    std::vector<float> textureData;
     std::vector<Triangle> triangles;
     std::vector<RayTracingMaterial> materials;
     std::vector<uint> lights;
@@ -73,9 +74,10 @@ class RayTracingRenderer {
     cl::Buffer outputBuffer;
 
     // scene related buffers
-    cl::Buffer textureBuffer;
     cl::Buffer triangleBuffer;
     cl::Buffer materialBuffer;
+    cl::Buffer textureRangeBuffer;
+    cl::Buffer textureDataBuffer;
     cl::Buffer bvhBuffer;
     cl::Buffer lightBuffer;
 #endif
@@ -113,15 +115,11 @@ class RayTracingRenderer {
     void drawFrameBuffer();
 
 public:
-#ifdef USECL
-
     bool initCL(int width, int height);
 
     void render(RayTracingScene &scene, Camera &camera);
 
     bool reloadShader();
-
-#endif
 
     bool initCPU(int width, int height);
 

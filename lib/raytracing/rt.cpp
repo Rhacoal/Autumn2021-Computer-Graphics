@@ -19,9 +19,28 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     bufferNeedUpdate = true;
     materials.clear();
     triangles.clear();
+    textures.clear();
     lights.clear();
     std::map<Material *, uint32_t> mtlMap;
-    std::vector<Texture> usedTextures;
+    std::map<uint, uint> usedTextures;
+    const auto addTexture = [&](const std::optional<Texture> &tex) -> uint {
+        if (!tex.has_value() || !tex->tex()) {
+            return TEXTURE_NONE;
+        }
+        auto texIt = usedTextures.find(tex->tex());
+        if (texIt != usedTextures.end()) {
+            return texIt->second;
+        }
+        RayTracingTextureRange rtTexture{
+            .offset = static_cast<uint>(textureData.size()) / 4,
+            .width = tex->width(),
+            .height = tex->height(),
+        };
+        textureData.insert(textureData.end(), tex->begin(), tex->end());
+        textures.emplace_back(rtTexture);
+        usedTextures.emplace(tex->tex(), static_cast<uint>(textures.size() - 1));
+        return textures.size() - 1;
+    };
     scene.traverse([&](Object3D &object) {
         Mesh *mesh = object.isMesh();
         if (!mesh || mesh->isBackground()) return;
@@ -50,9 +69,9 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
                 .specTrans = 0.0f,
                 .ior = 1.35f,
                 // maps
-                .albedoMap = MAP_NONE,
-                .metallicMap = MAP_NONE,
-                .roughnessMap = MAP_NONE,
+                .albedoMap = TEXTURE_NONE,
+                .metallicMap = TEXTURE_NONE,
+                .roughnessMap = TEXTURE_NONE,
             };
             if (mtl->isStandardMaterial()) {
                 auto stdMtl = mtl->isStandardMaterial();
@@ -60,15 +79,9 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
                 rtMtl.roughness = stdMtl->roughnessIntensity;
                 rtMtl.specTrans = stdMtl->specTrans;
                 rtMtl.ior = stdMtl->ior;
-                if (stdMtl->albedoMap.has_value()) {
-                    usedTextures.emplace_back(stdMtl->albedoMap.value());
-                }
-                if (stdMtl->metallicMap.has_value()) {
-                    usedTextures.emplace_back(stdMtl->metallicMap.value());
-                }
-                if (stdMtl->roughnessMap.has_value()) {
-                    usedTextures.emplace_back(stdMtl->roughnessMap.value());
-                }
+                rtMtl.albedoMap = addTexture(stdMtl->albedoMap);
+                rtMtl.metallicMap = addTexture(stdMtl->metallicMap);
+                rtMtl.roughnessMap = addTexture(stdMtl->roughnessMap);
             }
             mtlIndex = materials.size();
             mtlMap[mtl] = mtlIndex;
@@ -152,6 +165,12 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     if (lights.empty()) {
         lights.emplace_back();
     }
+    if (textures.empty()) {
+        textures.emplace_back();
+    }
+    if (textureData.empty()) {
+        textureData.resize(4);
+    }
 }
 
 struct CPUDispatcher {
@@ -225,6 +244,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
     dispatcher.dispatch(_width * _height, render_kernel,
         reinterpret_cast<float4 *>(accumulateFrameBuffer.data()), _width, _height,
         bvhMemBuffer, triangleMemBuffer, materialMemBuffer,
+        scene.textures.data(), reinterpret_cast<float4 *>(scene.textureData.data()),
         scene.lights.data(), scene.lights.size(),
         rayMemBuffer.data(), toFloat3(camera.position()), bounces,
         seedMemBuffer.data(), spp
@@ -237,6 +257,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
 }
 
 #ifdef USECL
+
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // update buffers (if needed)
     bool needClear = false;
@@ -244,13 +265,14 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     if (scene.bufferNeedUpdate || sceneBufferNeedUpdate) {
         needClear = true;
 
-        // TODO actually fill in these buffers
-        // textureBuffer = cl::Buffer(context, CL_MEM_READ_ONLY, (size_t) 24, nullptr, &err);
         triangleBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
             scene.triangles.size() * sizeof(Triangle), scene.triangles.data(), &err);
         materialBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
             scene.materials.size() * sizeof(RayTracingScene), scene.materials.data(), &err);
-        // scene.materials.size() * sizeof(RayTracingMaterial), scene.materials.data(), &err);
+        textureRangeBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            scene.textures.size() * sizeof(RayTracingTextureRange), scene.textures.data(), &err);
+        textureDataBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            scene.textureData.size() * sizeof(float), scene.textureData.data(), &err);
         bvhBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
             scene.bvh.nodes.size() * sizeof(BVHNode), scene.bvh.nodes.data(), &err);
         lightBuffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -266,23 +288,26 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         rayGenerationKernel.setArg(4, seedBuffer());
 
         // __global float4 *output, uint width, uint height,
-        renderKernel.setArg(0, accumulateBuffer());
-        renderKernel.setArg(1, _width);
-        renderKernel.setArg(2, _height);
+        renderKernel.setArg(RenderKernelArgs::output, accumulateBuffer());
+        renderKernel.setArg(RenderKernelArgs::width, _width);
+        renderKernel.setArg(RenderKernelArgs::height, _height);
         // __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
-        renderKernel.setArg(3, bvhBuffer());
-        renderKernel.setArg(4, triangleBuffer());
-        renderKernel.setArg(5, materialBuffer());
+        renderKernel.setArg(RenderKernelArgs::bvh, bvhBuffer());
+        renderKernel.setArg(RenderKernelArgs::triangles, triangleBuffer());
+        renderKernel.setArg(RenderKernelArgs::materials, materialBuffer());
+        // __global RayTracingTextureRange *textures, __global float *textureImage,
+        renderKernel.setArg(RenderKernelArgs::textures, textureRangeBuffer());
+        renderKernel.setArg(RenderKernelArgs::textureImage, textureDataBuffer());
         // __global uint *lights, uint lightCount,
-        renderKernel.setArg(6, lightBuffer());
-        renderKernel.setArg(7, static_cast<uint>(scene.lights.size()));
+        renderKernel.setArg(RenderKernelArgs::lights, lightBuffer());
+        renderKernel.setArg(RenderKernelArgs::lightCount, static_cast<uint>(scene.lights.size()));
         // __global Ray *rays, float3 cameraPosition, uint bounces,
-        renderKernel.setArg(8, rayBuffer());
-        renderKernel.setArg(9, toFloat3(pos));
-        renderKernel.setArg(10, bounces);
+        renderKernel.setArg(RenderKernelArgs::rays, rayBuffer());
+        renderKernel.setArg(RenderKernelArgs::cameraPosition, toFloat3(pos));
+        renderKernel.setArg(RenderKernelArgs::bounces, bounces);
         // ulong globalSeed, uint spp
-        renderKernel.setArg(11, seedBuffer());
-        renderKernel.setArg(12, spp);
+        renderKernel.setArg(RenderKernelArgs::globalSeed, seedBuffer());
+        renderKernel.setArg(RenderKernelArgs::spp, spp);
 
         // __global float4 *output, uint width, uint height
         clearKernel.setArg(0, accumulateBuffer());
@@ -317,7 +342,7 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
         pos = newPos;
 
         // float3 cameraPosition
-        renderKernel.setArg(9, toFloat3(pos));
+        renderKernel.setArg(RenderKernelArgs::cameraPosition, toFloat3(pos));
 
         // float3 cameraPosition, float3 cameraDir, float3 cameraUp,
         rayGenerationKernel.setArg(5, toFloat3(pos));
@@ -480,6 +505,19 @@ bool cg::RayTracingRenderer::reloadShader() {
     clearKernel = cl::Kernel(program, "clear_kernel");
     return true;
 }
+
+#else
+bool cg::RayTracingRenderer::initCL(int width, int height) {
+    return initCPU(width, height);
+}
+
+void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
+    renderCPU(scene, camera);
+}
+
+bool cg::RayTracingRenderer::reloadShader() {
+    return true;
+}
 #endif
 
 void cg::RayTracingRenderer::drawFrameBuffer() {
@@ -573,11 +611,11 @@ uint recur(std::vector<BVHNode> &nodes, std::vector<Triangle>::iterator first, s
         centroidBounds += iBound.centroid();
     }
     auto maxExtend = bounds.maxExtent();
-    std::sort(first, last, [maxExtend](const Triangle &a, const Triangle &b) -> bool {
+    auto leftSize = length / 2;
+    std::nth_element(first, first + leftSize, last, [maxExtend](const Triangle &a, const Triangle &b) -> bool {
         return a.bounds().centroid().s[maxExtend] < b.bounds().centroid().s[maxExtend];
     });
 
-    auto leftSize = length / 2;
     auto ret = push(nodes, BVHNode{bounds, 0, 0, maxExtend});
     recur(nodes, first, first + leftSize, baseIndex);
     nodes[ret].offset = recur(nodes, first + leftSize, last, baseIndex + leftSize);
