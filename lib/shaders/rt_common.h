@@ -51,6 +51,10 @@ CPP_INLINE float pow5(float v) {
     return t * t * v;
 }
 
+CPP_INLINE float maxComponent(float3 v) {
+    return (v.x < v.y ? (v.y < v.z ? v.z : v.y) : (v.x < v.z ? v.z : v.x));
+}
+
 CPP_INLINE float3 reflect(float3 I, float3 N) {
     return -I + 2.0f * N * dot(N, I);
 }

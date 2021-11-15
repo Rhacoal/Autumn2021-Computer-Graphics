@@ -102,7 +102,7 @@ class RayTracingRenderer {
     std::default_random_engine engine{r()};
 
     // raytracing config
-    uint bounces = 5;
+    uint bounces = 10;
 
     size_t frameBufferSize() const {
         return frameBuffer.size() * sizeof(float);

@@ -33,14 +33,27 @@
         "intensity": 1.0
       },
       "roughness": {
-        "intensity": 0.4
+        "intensity": 1.0
       }
     },
     {
       "id": "mtl-bunny",
       "type": "standard",
       "albedo": {
-        "color": [1.0, 1.0, 1.0]
+        "color": [0.798, 0.203, 1.056]
+      },
+      "metallic": {
+        "intensity": 1.0
+      },
+      "roughness": {
+        "intensity": 0.2
+      }
+    },
+    {
+      "id": "mtl-dragon",
+      "type": "standard",
+      "albedo": {
+        "color": [1.0, 1.0, 1.0, 0.1]
       },
       "metallic": {
         "intensity": 0.0
@@ -51,21 +64,6 @@
       "ior": 1.33,
       "transparent": true,
       "specTrans": 1.0
-    },
-    {
-      "id": "mtl-dragon",
-      "type": "standard",
-      "albedo": {
-        "color": [0.56, 0.57, 0.58]
-      },
-      "metallic": {
-        "intensity": 1.0
-      },
-      "roughness": {
-        "intensity": 0.01
-      },
-      "ior": 1.0,
-      "specTrans": 0.0
     },
     {
       "id": "mtl-glossy-mirror",
@@ -87,7 +85,7 @@
         "color": [1.0, 1.0, 1.0, 0.0]
       },
       "metallic": {
-        "intensity": 0.04
+        "intensity": 0.0
       },
       "roughness": {
         "intensity": 0.01
@@ -98,7 +96,7 @@
       "id": "mtl-glass-ball",
       "type": "standard",
       "albedo": {
-        "color": [1.0, 1.0, 1.0, 0.0]
+        "color": [1.0, 1.0, 1.0, 0.1]
       },
       "metallic": {
         "intensity": 0.0
@@ -107,8 +105,8 @@
         "intensity": 0.0
       },
       "transparent": true,
-      "ior": 1.5,
-      "specTrans": 1.00
+      "ior": 1.33,
+      "specTrans": 1.0
     },
     {
       "id": "mtl-mirror-box",
@@ -178,7 +176,7 @@
         "type": "sphere",
         "radius": 1.0
       },
-      "position": [3.0, 1.0, -2.0],
+      "position": [-3.0, 2.0, -3.75],
       "material": "mtl-ball"
     },
     {
@@ -187,8 +185,8 @@
         "type": "file",
         "file": "object/bun_zipper.ply"
       },
-      "position": [0.0, -0.3, -2.5],
-      "scale": [10.0, 10.0, 10.0],
+      "position": [2.0, -0.5, -3.5],
+      "scale": [15.0, 15.0, 15.0],
       "material": "mtl-bunny"
     },
     {
@@ -213,10 +211,10 @@
       "id": "dielectric-box",
       "geometry": {
         "type": "box",
-        "size": [2.0, 3.0, 2.0]
+        "size": [2.0, 1.0, 2.0]
       },
       "rotation": [0.8, 0.0, 0.6, 0.0],
-      "position": [-3.0, 1.5, -3.75],
+      "position": [-3.0, 0.5, -3.75],
       "material": "mtl-dieletric-box"
     },
     {
@@ -244,13 +242,24 @@
         "type": "sphere",
         "radius": 0.75
       },
-      "position": [-1.0, 0.75, 0.0],
+      "position": [0.0, 0.75, 0.0],
       "material": "mtl-glass-ball"
+    },
+    {
+      "id": "dragon",
+      "geometry": {
+        "type": "file",
+        "file": "object/dragon_vrip.ply"
+      },
+      "position": [-3.5, -1.0, 0.5],
+      "scale": [20.0, 20.0, 20.0],
+      "rotation": [-0.70710678, 0.0, 0.70710678, 0.0],
+      "material": "mtl-dragon"
     },
     {
       "id": "light",
       "isLight": true,
-      "position": [0.0, 4.99, -2.0],
+      "position": [0.0, 4.99, 0.0],
       "rotation": [0.0, 1.0, 0.0, 0.0],
       "geometry": {
         "type": "plane",

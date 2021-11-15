@@ -84,11 +84,11 @@ float3 BRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor, 
     return min(DiffuseBRDF(L, V, N, roughness, diffuseColor) + SpecularBRDF(L, V, N, roughness, specularR0), 1.0f);
 }
 
-float3 MixedBRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor, float3 specularR0,
+float3 MixedBRDF(float3 L, float3 V, float3 N, float roughness, float3 diffuseColor, float3 metallicR0,
                  float specTrans, float eta) {
     float3 H = normalize(L + V);
-    return min(DiffuseBRDF(L, V, N, roughness, diffuseColor) * (1.0f - specTrans) * IorToR0(dot(V, H), eta)
-        + SpecularBRDF(L, V, N, roughness, specularR0), 1.0f);
+    return min(DiffuseBRDF(L, V, N, roughness, diffuseColor) * (1.0f - specTrans)
+        + SpecularBRDF(L, V, N, roughness, metallicR0 + diffuseColor * specTrans * IorToR0(dot(V, H), eta)), 1.0f);
 }
 
 #endif //ASSIGNMENT_BXDF_H
