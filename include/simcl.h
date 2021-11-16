@@ -1,7 +1,7 @@
 #ifndef ASSIGNMENT_SIMCL_H
 #define ASSIGNMENT_SIMCL_H
 
-#ifdef USECL
+#ifndef NO_CL
 #include <cl.hpp>
 #else
 

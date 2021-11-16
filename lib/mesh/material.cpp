@@ -5,6 +5,7 @@
 #include <camera.h>
 #include <texture.h>
 
+#include <sstream>
 #include <string>
 #include <utility>
 #include <tuple>

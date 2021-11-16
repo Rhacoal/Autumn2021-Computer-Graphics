@@ -84,8 +84,4 @@ CPP_INLINE float3 metallicBRDFSample(float3 normal, float3 wo, float roughness, 
     return cosineWeightedHemisphereSample(normal, pdf, seed);
 }
 
-CPP_INLINE float3 surfaceGGXSample(float3 normal, float3 wo, float roughness, float eta, float *pdf, ulong *seed) {
-    
-}
-
 #endif //ASSIGNMENT_RT_COMMON_H

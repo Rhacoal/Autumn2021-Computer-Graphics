@@ -338,7 +338,7 @@ __kernel void render_kernel(
                     float pdf;
                     wi = cosineWeightedHemisphereSample(normal, &pdf, &seed);
                     float R0 = IorToR0(dot(wi, normalize(wi + wo)), eta);
-                    float3 brdf = BRDF(wi, wo, normal, material.roughness, diffuseColor, diffuseColor);
+                    float3 brdf = BRDF(wi, wo, normal, material.roughness, diffuseColor, diffuseColor * R0);
                     transmission *= brdf * dot(wi, normal) / pdf / diffuseChance * (1.0f - material.specTrans);
                 } else if (ev < 1.0f) {
                     // (perfecct) refraction

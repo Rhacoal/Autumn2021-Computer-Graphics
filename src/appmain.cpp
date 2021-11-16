@@ -87,7 +87,7 @@ public:
 
     AppMain() : camera(45, .1, 500, 16 / 9.f) {
         if (appMain) {
-            throw std::runtime_error("this application should be run in std::singleton mode!");
+            throw std::runtime_error("this application must be run in singleton mode!");
         }
         appMain = this;
     }
@@ -236,12 +236,12 @@ public:
                         rtRenderer.emplace();
                     }
                     if (cpuRendering) {
-                        rtRenderer->initCPU(160, 90);
+                        rtRenderer->initCPU(1024, 576);
                     } else {
-                        rtRenderer->initCL(3840, 2160);
+                        rtRenderer->initCL(1024, 576);
                     }
                     rtRendererScene.setFromScene(currentScene());
-                    puts("ray tracing set");
+                    puts("Ray tracing scene prepared");
                     use_ray_tracing = true;
                 }
             }

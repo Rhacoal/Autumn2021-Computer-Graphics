@@ -89,7 +89,6 @@ add_definitions(
         -DTW_NO_DIRECT3D
         -D_CRT_SECURE_NO_WARNINGS
         -DGL_SILENCE_DEPRECATION
-        -DUSECL
 )
 
 add_executable(assignment

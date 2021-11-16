@@ -6,6 +6,7 @@
 
 #include <utility>
 #include <memory>
+#include <vector>
 
 namespace cg {
 struct TextureImpl;

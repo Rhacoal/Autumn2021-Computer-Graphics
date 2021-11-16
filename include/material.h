@@ -29,6 +29,8 @@ public:
 
     Material(Material &&) = delete;
 
+    virtual ~Material() = default;
+
     virtual StandardMaterial *isStandardMaterial();
 
     /**

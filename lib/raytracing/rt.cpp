@@ -8,6 +8,7 @@
 
 #include <tinyfiledialogs.h>
 
+#include <sstream>
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -256,7 +257,7 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
     drawFrameBuffer();
 }
 
-#ifdef USECL
+#ifndef NO_CL
 
 void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     // update buffers (if needed)
@@ -335,7 +336,8 @@ void cg::RayTracingRenderer::render(RayTracingScene &scene, Camera &camera) {
     auto newUp = camera.up();
     auto newDir = camera.lookDir();
     auto newPos = camera.position();
-    if (glm::length(newUp - up) > 1e-5 || glm::length(newDir - dir) > 1e-5 || glm::length(newPos - pos) > 1e-5) {
+    if (needClear ||
+        (glm::length(newUp - up) > 1e-5 || glm::length(newDir - dir) > 1e-5 || glm::length(newPos - pos) > 1e-5)) {
         needClear = true;
         up = newUp;
         dir = newDir;

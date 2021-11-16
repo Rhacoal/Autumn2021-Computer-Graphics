@@ -7,7 +7,7 @@
 #include <shader.h>
 #include "lib/shaders/rt_structure.h"
 
-#ifdef USECL
+#ifndef NO_CL
 
 #include <cl.hpp>
 
@@ -50,7 +50,7 @@ class RayTracingRenderer {
     } ShaderParams;
     inline static std::optional<ShaderParams> trivialShader;
 
-#ifdef USECL
+#ifndef NO_CL
     cl::Platform platform;
     cl::Device device;
     cl::Context context;
