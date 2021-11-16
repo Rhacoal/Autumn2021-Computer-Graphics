@@ -193,6 +193,9 @@ RayTracingMaterial evaluateMaterial(__global RayTracingMaterial *material,
 }
 
 __kernel void raygeneration_kernel(
+#ifdef __cplusplus
+
+#endif
     __global float3 *output,
     uint width, uint height, uint spp,
     __global ulong *globalSeed,

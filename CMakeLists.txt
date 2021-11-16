@@ -91,6 +91,10 @@ add_definitions(
         -DGL_SILENCE_DEPRECATION
 )
 
+if (DEFINED NO_CL)
+    add_definitions(-DNO_CL)
+endif ()
+
 add_executable(assignment
         lib/application.cpp
         lib/helper/axis_helper.cpp

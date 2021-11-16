@@ -210,9 +210,6 @@ struct CPUDispatcher {
 };
 
 void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &camera) {
-    // no need to initCL cl first
-    // TODO initCL texture buffer
-//    auto textureMemBuffer = nullptr;
     auto triangleMemBuffer = scene.triangles.data();
     auto materialMemBuffer = scene.materials.data();
     auto bvhMemBuffer = scene.bvh.nodes.data();
@@ -226,19 +223,19 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
         std::fill(accumulateFrameBuffer.begin(), accumulateFrameBuffer.end(), 0.0f);
     }
     samples += spp;
-    CPUDispatcher dispatcher{.cores = 1};
+    CPUDispatcher dispatcher{.cores = 16};
     PerspectiveCamera *perspectiveCamera = camera.isPerspectiveCamera();
 
-    // __global Ray *output,
-    // uint width, uint height, uint spp, ulong globalSeed,
+    // __global float3 *output, uint width, uint height, uint spp, __global ulong *globalSeed,
     // float3 cameraPosition, float3 cameraDir, float3 cameraUp, float fov, float near
     dispatcher.dispatch(_width * _height, raygeneration_kernel,
         rayMemBuffer.data(), _width, _height, spp, seedMemBuffer.data(),
-        toFloat3(camera.position()), toFloat3(camera.lookDir()), toFloat3(camera.up()),
+        toFloat3(pos), toFloat3(dir), toFloat3(up),
         perspectiveCamera->fov() / 180.f * math::pi<float>(), perspectiveCamera->near());
 
     // __global float4 *output, uint width, uint height,
     // __global BVHNode *bvh, __global Triangle *triangles, __global RayTracingMaterial *materials,
+    // __global RayTracingTextureRange *textures, __global float4 *textureImage,
     // __global uint *lights, uint lightCount,
     // __global float3 *rays, float3 cameraPosition, uint bounces,
     // ulong globalSeed, uint spp
@@ -250,9 +247,9 @@ void cg::RayTracingRenderer::renderCPU(cg::RayTracingScene &scene, cg::Camera &c
         rayMemBuffer.data(), toFloat3(camera.position()), bounces,
         seedMemBuffer.data(), spp
     );
-    CPUDispatcher{.cores = 24}.dispatch(_width * _height * 4, [&]() {
+    dispatcher.dispatch(_width * _height * 4, [&]() {
         uint id = get_global_id(0);
-        frameBuffer[id] = accumulateFrameBuffer[id] / samples;
+        frameBuffer[id] = accumulateFrameBuffer[id] / static_cast<float>(samples);
     });
     drawFrameBuffer();
 }
@@ -397,7 +394,12 @@ bool cg::RayTracingRenderer::initCLDevice() {
     // Get all available OpenCL platforms (e.g. AMD OpenCL, Nvidia CUDA, Intel OpenCL)
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    // vbscript doesn't recognize \r\n
+    const char *endl = "\t";
+#else
     const char *endl = "\\r\\n";
+#endif
     int platform_index = -1;
     {
         std::stringstream text;
@@ -408,7 +410,9 @@ bool cg::RayTracingRenderer::initCLDevice() {
         }
         text << "Enter a number: (1 ~ " << platforms.size() << ')';
 
-        platform_index = 0;
+        if (platforms.size() == 1) {
+            platform_index = 0;
+        }
         // Pick one platform
         while (platform_index == -1) {
             auto text_str = text.str();
@@ -443,7 +447,9 @@ bool cg::RayTracingRenderer::initCLDevice() {
         }
         text << "Enter a number (1 ~ " << devices.size() << ')';
 
-//        device_index = 0;
+        if (devices.size() == 1) {
+            device_index = 0;
+        }
         while (device_index == -1) {
             auto text_str = text.str();
             char *ret = tinyfd_inputBox("Select a OpenCL device", text_str.c_str(), "");

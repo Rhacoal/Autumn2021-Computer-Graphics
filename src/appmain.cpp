@@ -65,7 +65,6 @@ class AppMain : public cg::Application {
 
     // objects
     Skybox *skybox = nullptr;
-    DirectionalLight *dirLight;
     Object3D *loadedObject = nullptr;
     Mesh *highlightObject = nullptr;
 
@@ -83,7 +82,8 @@ class AppMain : public cg::Application {
     static constexpr int bulletMaxLife = 60 * 60;
 public:
     bool cpuRendering = false;
-    static constexpr float camera_dist = 4.f / 1.414f;
+    int rtWidth = 1024;
+    int rtHeight = 576;
 
     AppMain() : camera(45, .1, 500, 16 / 9.f) {
         if (appMain) {
@@ -113,8 +113,6 @@ public:
 
         // lighting
         currentScene().addChild(new AmbientLight(glm::vec3(1.0f, 1.0f, 1.0f), .05f));
-//        dirLight = new DirectionalLight(glm::vec3(0.45f, -0.48f, 0.75f), glm::vec3(1.0f, 1.0f, 1.0f), 1.f);
-//        currentScene().addChild(dirLight);
 
         // camera
         camera.setPosition(glm::vec3(4.7f, 2.8f, 4.7f));
@@ -127,7 +125,7 @@ public:
         currentScene().addChild(new AxisHelper({1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 5));
 
         // control
-//        glfwSetInputMode(window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetInputMode(window(), GLFW_STICKY_KEYS, GLFW_TRUE);
         glfwSetCursorPosCallback(window(), [](GLFWwindow *, double mouseX, double mouseY) {
             auto &app = *appMain;
             if (app.showCursor) {
@@ -208,8 +206,7 @@ public:
             ImGui::Begin("Assignment 3");
             if (ImGui::Button("load scene...")) {
                 static constexpr const char *filter[] = {"*.json"};
-//                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
-                const char *path = "assets/scene/scene.json";
+                const char *path = tinyfd_openFileDialog("Load Scene", "", 1, filter, "scene file", 0);
                 if (path) {
                     auto obj = loadJsonScene(path);
                     if (!obj) {
@@ -235,14 +232,13 @@ public:
                     if (!rtRenderer.has_value()) {
                         rtRenderer.emplace();
                     }
-                    if (cpuRendering) {
-                        rtRenderer->initCPU(1024, 576);
-                    } else {
-                        rtRenderer->initCL(1024, 576);
+                    bool rendererInited = cpuRendering ? rtRenderer->initCPU(rtWidth, rtHeight)
+                                                       : rtRenderer->initCL(rtWidth, rtHeight);
+                    if (rendererInited) {
+                        rtRendererScene.setFromScene(currentScene());
+                        puts("Ray tracing scene prepared");
+                        use_ray_tracing = true;
                     }
-                    rtRendererScene.setFromScene(currentScene());
-                    puts("Ray tracing scene prepared");
-                    use_ray_tracing = true;
                 }
             }
 
@@ -253,7 +249,7 @@ public:
                 }
             }
 
-            if (ImGui::Button("export")) {
+            if (ImGui::Button("export (E)") | (glfwGetKey(window(), GLFW_KEY_E) == GLFW_PRESS)) {
                 if (use_ray_tracing && rtRenderer.has_value()) {
                     int rtWidth = rtRenderer->width();
                     int rtHeight = rtRenderer->height();
@@ -273,6 +269,7 @@ public:
                         }
                     }
                     stbi_write_png("output.png", rtWidth, rtHeight, 4, fbData.data(), rtWidth * 4);
+                    puts("Image saved to output.png");
                 }
             }
 
@@ -484,12 +481,37 @@ public:
 
 int main(int argc, const char **argv) {
     AppMain app;
+    int width = 0, height = 0;
     for (int i = 0; i < argc; ++i) {
         // cpu rendering
         if (strcmp(argv[i], "cpu") == 0) {
             app.cpuRendering = true;
         }
+        if (strlen(argv[i]) > 1) {
+            if (argv[i][0] == 'w') {
+                width = strtol(argv[i] + 1, nullptr, 10);
+                if (width < 1) {
+                    fprintf(stderr, "Invalid width: %s\n", argv[i]);
+                    exit(1);
+                }
+            } else if (argv[i][0] == 'h') {
+                height = strtol(argv[i] + 1, nullptr, 10);
+                if (height < 1) {
+                    fprintf(stderr, "Invalid height: %s\n", argv[i]);
+                    exit(1);
+                }
+            }
+        }
     }
+    if (width == 0 && height == 0) {
+        width = 1024;
+        height = 576;
+    } else if (width == 0 || height == 0) {
+        fprintf(stderr, "Invalid arguments! Both width and height should be specified\n");
+        exit(1);
+    }
+    app.rtWidth = width;
+    app.rtHeight = height;
     app.start(cg::ApplicationConfig{
         .window =  {
             .width = 1024, .height = 576,

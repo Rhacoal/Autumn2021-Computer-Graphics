@@ -52,7 +52,7 @@ typedef float *image2d_t;
 #define __global
 #define __kernel
 
-static inline thread_local uint workItemId[16];
+inline thread_local uint workItemId[16];
 
 inline void set_global_id(uint dimindx, uint value) {
     workItemId[dimindx] = value;

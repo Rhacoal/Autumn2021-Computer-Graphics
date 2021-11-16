@@ -194,6 +194,7 @@ struct ObjLoader {
 
         if (getOrDefault(j, "isLight", false)) {
             auto pointLight = new PointLight(mesh->material()->emission, 1.0f);
+            pointLight->setPosition(glm::vec3(0.0f, 0.001f, 0.0f));
             mesh->addChild(pointLight);
         }
         auto bb = mesh->computeBoundingBox();
