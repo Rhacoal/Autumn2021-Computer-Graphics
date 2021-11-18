@@ -52,7 +52,6 @@ GLuint cg::PhongMaterial::useShaderProgram(cg::Scene &sc, cg::Camera &cam, cg::P
     prevKey = key;
     // if update is needed, recompile a shader
     if (_shader_need_update) {
-        puts(shader.isNull() ? "Recreating phong shader." : "Creating phong shader.");
         std::string vert = phong_vertex;
         std::string frag = phong_fragment;
         const char *header_tag = "// {headers}";
@@ -127,7 +126,6 @@ GLuint cg::StandardMaterial::useShaderProgram(cg::Scene &scene, cg::Camera &came
     prevKey = key;
     // if update is needed, recompile a shader
     if (_shader_need_update) {
-        puts(shader.isNull() ? "Recreating standard shader." : "Creating standard shader.");
         std::string vert = standard_vertex;
         std::string frag = standard_fragment;
         const char *header_tag = "// {headers}";

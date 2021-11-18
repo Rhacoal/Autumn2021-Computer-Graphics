@@ -133,9 +133,6 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
         if (geometry->hasIndices()) {
             const auto &indices = geometry->getIndices().value();
             for (unsigned int i = 0; i < indices.size() - 2; i += 3) {
-                if (i % 3000 == 0) {
-                    std::cout << std::setw(10) << i << "/" << std::setw(10) << indices.size() << std::endl;
-                }
                 addTriangle(indices[i], indices[i + 1], indices[i + 2]);
             }
         } else {
@@ -149,8 +146,10 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     for (auto &material: materials) {
         isLight.emplace_back(material.emission.x + material.emission.y + material.emission.z > 1e-5f);
     }
+    puts("Building BVH from collected triangles");
     bvh.buildFromTriangles(triangles);
     // gather lighting triangles here since triangles might have been reordered
+    puts("Collecting light sources");
     for (size_t i = 0; i < triangles.size(); ++i) {
         if (isLight[triangles[i].mtlIndex]) {
             lights.push_back(i);
@@ -172,6 +171,7 @@ void cg::RayTracingScene::setFromScene(cg::Scene &scene) {
     if (textureData.empty()) {
         textureData.resize(4);
     }
+    puts("Scene building finished");
 }
 
 struct CPUDispatcher {

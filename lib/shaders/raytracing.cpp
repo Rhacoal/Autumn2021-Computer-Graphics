@@ -175,7 +175,7 @@ RayTracingMaterial evaluateMaterial(__global RayTracingMaterial *material,
 #ifdef __cplusplus
         result.albedo *= color;
 #else
-        result.albedo *= color.rgb;
+        result.albedo *= color.xyz;
 #endif
     }
     if (result.metallicMap != TEXTURE_NONE) {
@@ -400,7 +400,7 @@ __kernel void render_kernel(
                         Intersection lightRayIntersection;
                         Ray lightRay;
                         lightRay.direction = normalize(lightPos - pos);
-                        lightRay.origin = pos + lightRay.direction;
+                        lightRay.origin = pos; // + lightRay.direction;
                         bool intersectLight = firstIntersection(lightRay, bvh, triangles, &lightRayIntersection);
                         if (intersectLight
                             && !lightRayIntersection.side

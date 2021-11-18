@@ -101,8 +101,9 @@ struct ObjLoader {
     MeshGeometry *loadGeometryFromFile(const std::string &path) const {
         Assimp::Importer importer;
 
-        auto fspath = rootPath / path;
-        const aiScene *scene = importer.ReadFile(fspath.string(),
+        auto fspath = rootPath / std::filesystem::u8path(path);
+        auto fss = fspath.u8string();
+        const aiScene *scene = importer.ReadFile(std::string(reinterpret_cast<char*>(fss.data())),
             aiProcess_GenNormals |
             aiProcess_CalcTangentSpace |
             aiProcess_Triangulate |

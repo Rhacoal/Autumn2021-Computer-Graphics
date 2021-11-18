@@ -145,9 +145,7 @@ public:
             app.lastMouseY = mouseY;
         });
         glfwSetMouseButtonCallback(window(), [](GLFWwindow *, int button, int action, int mods) {
-            printf("click %d %d\n", button, action);
             if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
-                puts("rclicked");
                 appMain->rightButtonClicked = true;
             }
         });
@@ -236,7 +234,6 @@ public:
                                                        : rtRenderer->initCL(rtWidth, rtHeight);
                     if (rendererInited) {
                         rtRendererScene.setFromScene(currentScene());
-                        puts("Ray tracing scene prepared");
                         use_ray_tracing = true;
                     }
                 }

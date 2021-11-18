@@ -115,8 +115,6 @@ void cg::Application::start(const ApplicationConfig &config) {
     }
 
     printf("OpenGL version: %s\n", reinterpret_cast<const char *>(glGetString(GL_VERSION)));
-    printf("glGenVertexArrays: %p\n", glGenVertexArrays);
-    printf("glShaderSource: %p\n", glShaderSource);
 
     // Ensure we can capture the escape key being pressed below
     glfwSetInputMode(_window, GLFW_STICKY_KEYS, GL_TRUE);
